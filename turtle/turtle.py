@@ -13,6 +13,7 @@ class Textbox(object):
         self.height = height
         self.text = []
         self.clicked = False
+        self.index=0
 
     def in_bounds(self, x, y):
         if ((self.x <= x <= self.x + self.width) and
@@ -23,7 +24,13 @@ class Textbox(object):
         return False
     
     def add_text(self, c):
-        self.text += [c]
+        self.text.insert(self.index, c)
+        self.index+=1
+
+    def move_index(self, delta):
+        if self.index + delta < 0 or self.index + delta >= len(self.text):
+            return
+        self.index += delta
 
     def backspace(self):
         if len(self.text) > 0:
@@ -38,15 +45,19 @@ class Textbox(object):
         if counter % 10 < 5 and self.clicked:
             
             self.text.append("|")
-            canvas.create_text(self.x + margin, self.y + margin, text="".join(self.text), 
+            canvas.create_text(self.x + margin, self.y + margin, 
+                text="".join(self.text), 
                 anchor=NW, font="14")
             self.text.pop()
         else:
-            canvas.create_text(self.x + margin, self.y + margin, text="".join(self.text), 
+            canvas.create_text(self.x + margin, self.y + margin, 
+                text="".join(self.text), 
                 anchor=NW)
 
     def get_text(self):
         return "".join(self.text)
+
+
 """
 Input is a multi-line string of "code" w/ the following constraints:
     -valid variable names include: x, y, color, (angle, r)
@@ -55,16 +66,23 @@ Input is a multi-line string of "code" w/ the following constraints:
     -valid commands: repeat <int> times,
                      if/else 
 """
+
+#TODO: SUPPORT IF/IF-ELSE; WHILE LOOPS (ugh); HINT SYSTEM; line number errors;
+# syntax highlighting
+# window size bug
+# fontsize variability
+# draw image/copy image functionality
 def interpret(data, code, x0=0, y0=0, x1=0, y1=0):
 
     color = ""
     i = 0
-    # print(code.splitlines())
+    # print("starting code:", code)
     code_lines = code.splitlines()
     n = len(code_lines)
+
     while (i < n):
         line = code_lines[i]
-        # print(line)
+        print("processing line:", line)
         if line.startswith("x"):
             # if you can't split, then there's a syntax error
             expr = line.split("->")[1].strip()
@@ -74,16 +92,29 @@ def interpret(data, code, x0=0, y0=0, x1=0, y1=0):
             else: 
                 if components[0].strip() != "x": 
                     data.error = True
-                    data.err_msg = "TODO"
+                    data.err_msg = "invalid variable name - should be x"
                     return
                 x1 = x1 + int(components[1].strip())
 
         elif line.startswith("y"):
             # if you can't split, then there's a syntax error
-            y1 = int(line.split("->")[1].strip())
+            expr = line.split("->")[1].strip()
+
+            components = expr.split("+")
+            if len(components) < 2:
+                y1 = int(components[0])
+            else: 
+                if components[0].strip() != "y": 
+                    data.error = True
+                    data.err_msg = "invalid variable name - should be y"
+                    return
+                y1 = y1 + int(components[1].strip())
 
         elif line.startswith("color"):
             # if you can't split, then there's a syntax error
+            if (len(line.split("->")) < 2):
+                data.error = True
+                data.err_msg = "Syntax error: should be of the form \'color -> black\'"
             color = line.split("->")[1].strip() 
 
         # TODO: (maybe) elif line.startswith("angle"):
@@ -97,29 +128,41 @@ def interpret(data, code, x0=0, y0=0, x1=0, y1=0):
             
         elif line.startswith("repeat"): 
             # get the number between the end of repeat and before the colon
-            n = int(line.split(":")[0][6:].strip())
-            if not(line.startswith("\t") or line.startswith("    ") 
-            or line.startswith("  ")): 
-                data.error = True
-                data.err_msg = "No content to repeat"
+            m = int(line.split(":")[0][6:].strip())
 
-            body = ""
+            # if not(line.startswith("\t") or line.startswith("    ") 
+            # or line.startswith("  ")):
+            #     print(repr(line)) 
+            #     data.error = True
+            #     data.err_msg = "No content to repeat"
+            #     return 
+
+            body = []
             k = i + 1
-            while (code[i][0].isspace()):
-                body += code[k].strip()
+            while (k < len(code_lines) and len(code_lines[k]) > 0 
+                   and code_lines[k][0].isspace()):
+                body += [code_lines[k].strip(), "\n"]
                 k += 1
-            for j in range(n):
-                interpret(data, code, x0, y0, x1, y1)
-            i += k
-            continue
+
+            for j in range(m):    
+                (x0, y0, x1, y1) = interpret(data, "".join(body), 
+                                              x0, y0, x1, y1)
+            i = k - 1
+            # continue
+
+        elif line == "" or line.isspace() or line.startswith("#"):
+            print("I'M EMPTY!")
+            pass
 
         else:
             # print some exception
+            print("error:", repr(line))
             data.error = True
             data.err_msg = "Invalid starting keyword"
             return
-
         i += 1
+
+    return (x0, y0, x1, y1)
 
 def draw_code(canvas, data):
 
@@ -129,10 +172,12 @@ def draw_code(canvas, data):
     for obj in data.to_draw:
         (x0, y0, x1, y1, color) = obj
         try:
+            # negating y to account for conversion to graphical coordinates
+            # to cartesian coordinates
             canvas.create_line(x0 + cx,
-                               y0 + cy, 
+                               -y0 + cy, 
                                x1 + cx, 
-                               y1 + cy, fill=color, width=5)
+                               -y1 + cy, fill=color, width=5)
         except Exception as e:
             data.error = True
             data.err_msg = "Error: " + str(e)
@@ -178,9 +223,6 @@ def draw_axes(canvas, data):
         canvas.create_line(mx_l, my, mx_r, my)
         canvas.create_line(mx_l, my_n, mx_r, my_n)
 
-
-
-
 def init(data):
     data.counter = 0
     data.to_draw = []
@@ -199,33 +241,33 @@ def init(data):
     data.code = ""
     data.error = False
     data.err_msg = ""
-#     data.code = """x -> -25
-# y -> 25
-# color -> none
-# draw
-# y -> -25
-# color -> black
-# draw
-# x->-25
-# y->0
-# draw
-# x->-5
-# draw
-# y->25
-# color->none
-# draw
-# y->-25
-# color->black
-# draw
-# x->5
-# y->25
-# color->none
-# draw
-# y->-25
-# color->blue
-# draw
-# """
-    # interpret(data, data.code)
+    data.code = """x -> -25
+y -> 25
+color -> none
+draw
+y -> -25
+color -> black
+draw
+x->-25
+y->0
+draw
+x->-5
+draw
+y->25
+color->none
+draw
+y->-25
+color->black
+draw
+x->5
+y->25
+color->none
+draw
+y->-25
+color->blue
+draw
+"""
+    interpret(data, data.code)
 
 def mousePressed(event, data):
     # use event.x and event.y
@@ -238,13 +280,19 @@ def keyPressed(event, data):
     # use event.char and event.keysym
     
     if data.type_mode:
-        valid = "->+-" 
+        valid = "->+-#:" 
         if event.keysym == "Return":
             data.textbox.add_text("\n")
         elif event.keysym == "Tab":
-            data.textbox.add_text("\t")
+            data.textbox.add_text("    ")
         elif event.keysym == "BackSpace":
             data.textbox.backspace()
+        # elif event.keysym == "Right":
+        #     print("RIGHT")
+        #     data.textbox.move_index(1)
+        # elif event.keysym == "Left":
+        #     print("LEFT")
+        #     data.textbox.move_index(-1)
         elif (event.char.isalpha() 
              or event.char.isdigit() 
              or event.char.isspace()
@@ -273,9 +321,9 @@ def redrawAll(canvas, data):
                             data.height - data.draw_window_margin, width=3)
     data.textbox.draw(canvas, data.counter)
     if data.error:
-        canvas.create_text(data.draw_window_cx, 
-                           data.draw_window_cy, 
-                           text=data.err_msg)
+        canvas.create_text(data.draw_window_margin + data.margin, 
+                           data.draw_window_margin + data.margin, 
+                           text=data.err_msg, anchor=NW)
     else:
         draw_code(canvas, data)
 
