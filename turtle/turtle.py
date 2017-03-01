@@ -7,14 +7,16 @@ Current features:
   - repeat loops
   - break points THEY SEEM TO WORK!!
   - print statements work too
+  - eval expr using eval and checking for valid syms only
+  - saving and loading of up to 10 diff files (by using keyboard lel)
+  - if statements
+  - debug mode (using breaks)
   - TODO:
-   - saving and loading of 1 file (s/l)
-   - debug mode (using breaks)
-   - self-check on drawing
-   - if statements; else statements
+   - self-check on drawing game
+   - implement else statements 
    - general variables
-   - functions -> does not need to report recursion :D
-   - game
+   - functions -> does not need to support recursion :D
+ 
 """
 
 # Begin writing interpreter for Adaas
@@ -109,40 +111,114 @@ class Textbox(object):
 # vals is a list of values corresponding to the appropriate index of var
 # i is the line number 
 def eval_expr(data, expr, var, vals, i):
-    # if var not in expr: 
-    #     try: 
-    #         return int(expr)
-    #     except:
-    #         data.error = True
-    #         data.err_msg = "math syntax error"
-    #         data.err_line = i
-    #         return None
-    # else:
-    try:   
+
+    try:
+        elist = list(expr)
+        offset = 0
+
+        # fix formatting -> change % to %%
+        for i in range(len(expr)):
+            if expr[i] == "%":
+                elist.insert(i + offset, "%")
+                offset += 1
+        expr = "".join(elist)
+
         for i in range(len(var)):
             if (var[i] in expr):
-                expr = expr.replace(var[i], "%d") % vals[i]
-    except:
+                temp = expr.replace(var[i], "%d")
+                expr = temp % vals[i]
+    except Exception as e:
+        print("Error:", e)
         data.error = True
         data.err_msg = "invalid variable name - should be %s" % var
         data.err_line = i 
         return None
+    # print("expr", expr)
     try:
-        return data.nsp.eval(expr)
+        safe_syms = "<>/*+-.()%="
+        for c in expr:
+            if not(c.isspace() or c.isalpha() or c.isdigit() or c in safe_syms):
+                data.error = True
+                data.err_msg = "math syntax error"
+                data.err_line = i
+                return None    
+        
+        return eval(expr)
     except:
         data.error = True
         data.err_msg = "math syntax error"
         data.err_line = i
         return None
 
+def strip_end(s):
+    slist = list(s)
+    for i in range(len(s), 0, -1):
+        if not(slist[i - 1].isspace()):
+            break
+    return "".join(slist[:i])
+
 # returns list of split lines and new line number
 def get_indent_body(data, code_lines, k):
     body = []
+    print("get_indent_body")
+    print(code_lines)
+    print(k < len(code_lines))
+    print(len(code_lines[k]) > 0)
+    print(code_lines[k][0].isspace())
     while (k < len(code_lines) and len(code_lines[k]) > 0 
            and code_lines[k][0].isspace()):
-        body += [code_lines[k].strip(), "\n"]
+        start = code_lines[k][0]
+        if start == " ":
+            code_lines[k] = code_lines[k][4:] # get rid of 4 tabbed spaces
+        elif start == "\t":
+            code_lines[k] = code_lines[k][1:]
+        else:
+            print(code_lines[k])
+            raise Exception("you missed something")
+        body += [strip_end(code_lines[k]), "\n"]
         k += 1
     return body, k
+
+def filter_space(code_lines, debug=False):
+
+    filtered_code = []
+    for i in range(len(code_lines)):
+        line = code_lines[i]
+        if not(line == "" or line.isspace() or line.startswith("#")):
+            # if (debug and (i != 0)): # don't add break before first line
+            #     debug_line = "break"
+            #     if line[0].isspace():
+            #         for j in range(len(line)):
+            #             if not(line[j].isspace()):
+            #                 break
+            #         debug_line = line[:j] + debug_line
+  
+            #     result.append(debug_line)
+            #     result.append(line)
+            #     if (i == len(code_lines) - 1):
+            #         result.append(debug_line) # add extra break at the end
+        
+            filtered_code.append(strip_end(line))
+
+    if debug:
+        result = [filtered_code[0]]
+        for i in range(1, len(filtered_code)):
+            debug_line = "break"
+            if line[0].isspace():
+                for j in range(len(line)):
+                    if not(line[j].isspace()):
+                        break
+                debug_line = line[:j] + debug_line
+            result.append(debug_line)
+            result.append(filtered_code[i])
+            if (i == len(filtered_code) - 1):
+                result.append(debug_line)
+    else:
+        result = filtered_code
+
+    print("filter space result")
+    print(result)
+    return result
 
 # TODO: SUPPORT IF/IF-ELSE; WHILE LOOPS (ugh); HINT SYSTEM
 # Sarah - syntax highlighting
@@ -175,10 +251,6 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
 
     while (i < n):
         line = code_lines[i]
-        print("hi")
-        print(line)
-        print("i", i)
-        print("n", n)
         # print("processing line:", line)
         if line.startswith("x"):
             # if you can't split, then there's a syntax error
@@ -220,19 +292,11 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
             cond = None
             try: 
                 # get contents between parens
-                print(repr(line))
                 start = line.find("(")
                 end = line.find(")")
-                print(line[start+1:end])
-                print(start)
-                print(end)
                 expr = line[start + 1:end]
-                print(cond)
-                print("condition: ", repr(cond))
                 #DEFINE VAR AND VAL
                 cond = eval_expr(data, expr, ["x", "y"], [x1, y1], i)
-                print("crashed")
-
 
             except Exception as e:
                 print("here!")
@@ -246,13 +310,16 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                 data.err_msg = str("Condition not set")
                 data.err_line = i 
                 return 
+            (body, k) = get_indent_body(data, code_lines, i + 1)
             if (cond):
-                body, k = get_indent_body(data, code_lines, i + 1)
+                # (body, k) = get_indent_body(data, code_lines, i + 1)
+                print(k)
+                print("body: ", body)
                 result = interpret(data, "".join(body), 0, color, 0, x0, y0, x1, y1)
 
-                if result == None and data.err: #error occured
+                if result == None and data.error: #error occured
                     return 
-                (break_called, x0, y0, x1, y1, color) = result
+                (_, break_called, x0, y0, x1, y1, color) = result
                 if break_called:
                     # you might want to update the variables 
                     # frame is line number, color, #repeats, and coord vals
@@ -260,7 +327,9 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                     print("appending frame: ", frame)
                     data.frames.append(frame)
                     return (False, True, x0, y0, x1, y1, color)
-            i = k
+            else:
+                print("not cond")
+            i = k - 1
 
         elif line.startswith("repeat"): 
             # get the number between the end of repeat and before the colon
@@ -273,14 +342,17 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                 data.err_line = i 
                 return None
             
+            print("before get_indent_body")
+            print(i + 1)
+            print(code_lines)
             body, k = get_indent_body(data, code_lines, i + 1)
-            # print("code body:\n", "".join(body))
+            print("repeat loop body:\n", "".join(body))
             # print(k)
             # never entered the while loop
             if k == i + 1: 
                 data.error = True
                 data.err_msg = "no content to repeat\n\
-(Hint: remember to indent the block you would like to repeat)"
+(Hint: remember to indent the block\nyou would like to repeat)"
                 data.err_line = k 
                 return None
 
@@ -292,7 +364,7 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                 else: 
                     result = interpret(data, "".join(body), 0, color, 0, x0, y0, x1, y1)
                 
-                if result == None and data.err: # error occured
+                if result == None and data.error: # error occured
                     return 
                 (terminated, break_called, x0, y0, x1, y1, color) = result
                 if break_called:
@@ -318,14 +390,13 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                     return (False, True, x0, y0, x1, y1, color)
                 
 
-            i = k
+            i = k - 1
+            print("i = %d" % k)
 
         elif line.startswith("print"):
             s = line[len("print("):]
             end = s.find(")")
             s = s[:end]
-            print("inside print")
-            print(s)
             # TypeError: not all arguments converted during string formatting
             variables = ["x", "y"]
             vals = [x1, y1]
@@ -349,9 +420,6 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
             data.frames.append(frame)
             return (False, True, x0, y0, x1, y1, color)
 
-        elif line == "" or line.isspace() or line.startswith("#"):
-            pass
-
         else:
             # print some exception
             print("error:", repr(line))
@@ -359,7 +427,7 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
             data.err_msg = "invalid starting keyword"
             data.err_line = i 
             return None
-        print("incrementing i!")
+    
         i += 1
 
     return (True, False, x0, y0, x1, y1, color)
@@ -444,12 +512,14 @@ def init_GUI(data):
 def init(data):
     init_GUI(data)
     data.nsp = NumericStringParser()
+    data.debug_mode = False
     data.type_mode = False
     data.counter = 0
     data.frames = []
     data.print_string = [] # each string in this list should be separated by new line
     data.help = False
     data.error = False
+    data.ver = None
     data.err_line = 0
     data.err_msg = ""
     data.code = """x <- -25
@@ -491,7 +561,7 @@ def keyPressed(event, data):
     # use event.char and event.keysym
     
     if data.type_mode:
-        valid = "<-+#:()^*/" 
+        valid = "\<-+#:()^*/%=" 
         if event.keysym == "Return":
             data.textbox.add_text("\n")
         elif event.keysym == "Tab":
@@ -512,6 +582,8 @@ def keyPressed(event, data):
         data.to_draw = []
         data.frames = []
         data.print_string = []
+        code_lines = filter_space(data.code.splitlines(), data.debug_mode)
+        data.code = "\n".join(code_lines)
         interpret(data, data.code)
         print("frame post return: ", data.frames)
 
@@ -519,14 +591,23 @@ def keyPressed(event, data):
     elif event.char == "a":
         data.axes = not(data.axes)
 
+    elif event.char == "d":
+        data.debug_mode = not(data.debug_mode)
+
+    elif event.char.isdigit():
+        ver = int(event.char)
+        if ver == 0:
+            data.ver = None
+        else:
+            data.ver = int(event.char)
     # save code written
     elif event.char == "s":
-        data.textbox.save()
+        data.textbox.save(data.ver)
         print("data saved")
 
     # load previous code written
     elif event.char == "l":
-        data.textbox.load()
+        data.textbox.load(data.ver)
         print("data loaded")
 
     # help
@@ -553,14 +634,24 @@ def keyPressed(event, data):
 def timerFired(data):
     data.counter += 1
 
-def redrawAll(canvas, data):
-    
-    if data.axes:
-        draw_axes(canvas, data)
+def draw_screens(canvas, data):
     canvas.create_rectangle(data.draw_window_margin, data.draw_window_margin,
                             data.draw_window_margin + data.draw_window_width, 
                             data.height - data.draw_window_margin, width=3)
     data.textbox.draw(canvas, data.counter)
+
+def redrawAll(canvas, data):
+
+    draw_screens(canvas, data)
+
+    if data.debug_mode:
+        canvas.create_text(data.draw_window_margin + data.margin,
+                           data.draw_window_margin + data.draw_window_height,
+                           text="Debug Mode",
+                           anchor=SW)
+    if data.axes:
+        draw_axes(canvas, data)
+    
     if data.error:
         err_msg = "Error on line %d: %s" % (data.err_line, data.err_msg)
         canvas.create_text(data.draw_window_margin + data.margin, 
