@@ -1,7 +1,7 @@
 """
 Ananya Rajgarhia
 1/20/17
-NOTE: numericStringParser requires pyparsing 
+NOTE: numericStringParser requires pyparsing (currently not using numericStringParser though)
 Current features:
   - addition, subtraction, mod, division, multiplication, int division
   - repeat loops
@@ -12,16 +12,18 @@ Current features:
   - if statements
   - debug mode (using breaks)
   - TODO:
-   - self-check on drawing game
+   - repeat var: (if var changes within the loop, doesn't affect repeat)
    - implement else statements 
    - general variables
+   - while loops. ... ):
+   - self-check on drawing game
    - functions -> does not need to support recursion :D
  
 """
 
 # Begin writing interpreter for Adaas
 from tkinter import *
-from Modules.numericStringParser import NumericStringParser 
+# from Modules.numericStringParser import NumericStringParser 
 
 # taken from http://www.kosbie.net/cmu/fall-14/15-112/notes/file-and-web-io.py
 def readFile(filename, mode="rt"):
@@ -133,7 +135,7 @@ def eval_expr(data, expr, var, vals, i):
         data.err_msg = "invalid variable name - should be %s" % var
         data.err_line = i 
         return None
-    # print("expr", expr)
+
     try:
         safe_syms = "<>/*+-.()%="
         for c in expr:
@@ -150,6 +152,7 @@ def eval_expr(data, expr, var, vals, i):
         data.err_line = i
         return None
 
+# strip but doesn't strip the beginning because indents are important
 def strip_end(s):
     slist = list(s)
     for i in range(len(s), 0, -1):
@@ -158,13 +161,9 @@ def strip_end(s):
     return "".join(slist[:i])
 
 # returns list of split lines and new line number
+# extracts indented body of code as in body of for loop/if statement etc.
 def get_indent_body(data, code_lines, k):
     body = []
-    print("get_indent_body")
-    print(code_lines)
-    print(k < len(code_lines))
-    print(len(code_lines[k]) > 0)
-    print(code_lines[k][0].isspace())
     while (k < len(code_lines) and len(code_lines[k]) > 0 
            and code_lines[k][0].isspace()):
         start = code_lines[k][0]
@@ -179,27 +178,16 @@ def get_indent_body(data, code_lines, k):
         k += 1
     return body, k
 
+# gets rid of empty lines
 def filter_space(code_lines, debug=False):
 
     filtered_code = []
     for i in range(len(code_lines)):
         line = code_lines[i]
         if not(line == "" or line.isspace() or line.startswith("#")):
-            # if (debug and (i != 0)): # don't add break before first line
-            #     debug_line = "break"
-            #     if line[0].isspace():
-            #         for j in range(len(line)):
-            #             if not(line[j].isspace()):
-            #                 break
-            #         debug_line = line[:j] + debug_line
-  
-            #     result.append(debug_line)
-            #     result.append(line)
-            #     if (i == len(code_lines) - 1):
-            #         result.append(debug_line) # add extra break at the end
-        
             filtered_code.append(strip_end(line))
 
+    # adds break statements between lines
     if debug:
         result = [filtered_code[0]]
         for i in range(1, len(filtered_code)):
@@ -215,25 +203,7 @@ def filter_space(code_lines, debug=False):
                 result.append(debug_line)
     else:
         result = filtered_code
-
-    print("filter space result")
-    print(result)
     return result
-
-# TODO: SUPPORT IF/IF-ELSE; WHILE LOOPS (ugh); HINT SYSTEM
-# Sarah - syntax highlighting
-# Sarah - fontsize variability
-# Sarah - display line numbers
-# radial coordinates
-# draw image/copy image functionality?? lol
-# move them towards: for i in range(5) syntax; final level <- use i
-# save code (to file)
-# debug mode that lets them step through line by line
-
-#GOALS for next meeting:
-# break points!!! + print statements
-# if/else
-# tutorial: variables (concept of picking up pencil), repeat, print, mod, if else, while, functions(no args no return)
 
 """
 code: a multi-line string of "code" w/ the following constraints:
@@ -247,7 +217,6 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
 
     code_lines = code.splitlines()
     n = len(code_lines)
-    print("\n".join(code_lines))
 
     while (i < n):
         line = code_lines[i]
@@ -368,20 +337,12 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                     return 
                 (terminated, break_called, x0, y0, x1, y1, color) = result
                 if break_called:
-                    # print("j + 1 = ", j + 1)
-                    # print("m = ", m)
-                    # print("repeated = ", repeated)
+                    
                     if j + 1 > m - repeated:
                         print("we should be exiting the loop")
-                        # data.frames.pop() # get rid of whatever was appended when you recursed
                         i = k
-                    # if i < n:
-                    # OFF BY 1 ERROR - you repeat 1 less times than you want to
-                    # frame is line number, color, #repeats, and coord vals
-                    # ISSUE: how do we keep track of whether we finished the inner part of the loop?
-                    # current solution: return extra bool that indicates whether you terminated or not
-                    # if you didn't add any frames, then that means you finished everything
-                    # if (len(data.frames) == num_frames - 1): repeated += 1
+    
+                    # terminated keeps track of whether you've completed the inner loop or not
                     print("terminated: ", terminated)
                     if (terminated): repeated += 1
                     frame = (i, color, repeated, x0, y0, x1, y1)
@@ -397,25 +358,19 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
             s = line[len("print("):]
             end = s.find(")")
             s = s[:end]
-            # TypeError: not all arguments converted during string formatting
             variables = ["x", "y"]
             vals = [x1, y1]
             for j in range(len(variables)):
                 var = variables[j]
                 if var in s:
                     s = s.replace(var, "%d") % vals[j]
-            # s = s.replace("y", "%d") % y1
-            # s = s.replace("color", "%s") % color
+    
             data.print_string.append(s)
 
         elif line.startswith("break"):
             frame = (i + 1, color, 0, x0, y0, x1, y1)
-            print("append frame or not?")
-            print("n", n)
-            print("i", i)
+            
             if (i + 1) == n:
-                print("break in interpret appending:", frame)
-                # data.frames.append(frame)
                 return (True, True, x0, y0, x1, y1, color)
             data.frames.append(frame)
             return (False, True, x0, y0, x1, y1, color)
