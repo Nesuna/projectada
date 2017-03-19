@@ -13,7 +13,6 @@ Current features:
   - debug mode (using breaks)
   - TODO:
    - repeat var: (if var changes within the loop, doesn't affect repeat)
-   - implement else statements 
    - general variables
    - while loops. ... ):
    - self-check on drawing game
@@ -280,17 +279,31 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                 data.err_line = i 
                 return 
             (body, k) = get_indent_body(data, code_lines, i + 1)
+            
+            else_exists = False
+            else_body = []
+            if k < n and code_lines[k].startswith("else"):
+                else_exists = True
+                (else_body, k) = get_indent_body(data, code_lines, k + 1) 
+            
             if (cond):
-                # (body, k) = get_indent_body(data, code_lines, i + 1)
-                print(k)
-                print("body: ", body)
                 result = interpret(data, "".join(body), 0, color, 0, x0, y0, x1, y1)
 
                 if result == None and data.error: #error occured
                     return 
                 (_, break_called, x0, y0, x1, y1, color) = result
                 if break_called:
-                    # you might want to update the variables 
+                    # frame is line number, color, #repeats, and coord vals
+                    frame = (i, color, 0, x0, y0, x1, y1)
+                    # print("appending frame: ", frame)
+                    data.frames.append(frame)
+                    return (False, True, x0, y0, x1, y1, color)
+            elif (else_exists):
+                result = interpret(data, "".join(else_body), 0, color, 0, x0, y0, x1, y1)
+                if result == None and data.error: #error occured
+                    return 
+                (_, break_called, x0, y0, x1, y1, color) = result
+                if break_called:
                     # frame is line number, color, #repeats, and coord vals
                     frame = (i, color, 0, x0, y0, x1, y1)
                     print("appending frame: ", frame)
@@ -298,7 +311,7 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                     return (False, True, x0, y0, x1, y1, color)
             else:
                 print("not cond")
-            i = k - 1
+            i = k - 1 # minus 1 because you ++ at end
 
         elif line.startswith("repeat"): 
             # get the number between the end of repeat and before the colon
@@ -375,6 +388,9 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
             data.frames.append(frame)
             return (False, True, x0, y0, x1, y1, color)
 
+        elif "<-" in line:
+            (var, val) = (line.split("<-")[0], line.split("<-")[1])
+            data.custom_vars[var] = val 
         else:
             # print some exception
             print("error:", repr(line))
@@ -463,15 +479,23 @@ def init_GUI(data):
     data.axes = False
     data.textbox = Textbox(textx, texty, textw, texth)
 
+def init_compile_data(data):
+    data.custom_vars = dict()
+    data.error = False
+    data.err_msg = ""
+    data.code = data.textbox.get_text()
+    data.to_draw = []
+    data.frames = []
+    data.print_string = []
 
 def init(data):
     init_GUI(data)
-    data.nsp = NumericStringParser()
+    init_compile_data(data)
+    
     data.debug_mode = False
     data.type_mode = False
     data.counter = 0
-    data.frames = []
-    data.print_string = [] # each string in this list should be separated by new line
+     # each string in this list should be separated by new line
     data.help = False
     data.error = False
     data.ver = None
@@ -531,6 +555,7 @@ def keyPressed(event, data):
 
     elif event.keysym == "Return":
         # when you break and then recompile something weird happens
+        data.custom_vars = dict()
         data.error = False
         data.err_msg = ""
         data.code = data.textbox.get_text()
@@ -540,7 +565,7 @@ def keyPressed(event, data):
         code_lines = filter_space(data.code.splitlines(), data.debug_mode)
         data.code = "\n".join(code_lines)
         interpret(data, data.code)
-        print("frame post return: ", data.frames)
+        # print("frame post return: ", data.frames)
 
     # display axes
     elif event.char == "a":
