@@ -2,25 +2,28 @@
 Ananya Rajgarhia
 1/20/17
 NOTE: numericStringParser requires pyparsing (currently not using numericStringParser though)
+Ask Sarah:
+  - what do you think syntax for function should be
+  - how git (like if I wanna pull/merge the UI changes)
 Current features:
   - addition, subtraction, mod, division, multiplication, int division
   - repeat loops
-  - break points THEY SEEM TO WORK!!
+  - break points
   - print statements work too
   - eval expr using eval and checking for valid syms only
   - saving and loading of up to 10 diff files (by using keyboard lel)
   - if statements
   - debug mode (using breaks)
+  - general variables
+  - while loops
   - TODO:
-   - repeat var: (if var changes within the loop, doesn't affect repeat)
-   - general variables
-   - while loops. ... ):
+   - convert everything to data
    - self-check on drawing game
    - functions -> does not need to support recursion :D
  
 """
 
-# Begin writing interpreter for Adaas
+# Begin writing interpreter for Adaas <- saada
 from tkinter import *
 # from Modules.numericStringParser import NumericStringParser 
 
@@ -111,7 +114,7 @@ class Textbox(object):
 # var is a list of strs that are variable names
 # vals is a list of values corresponding to the appropriate index of var
 # i is the line number 
-def eval_expr(data, expr, var, vals, i):
+def eval_expr(data, expr, line_num):
 
     try:
         elist = list(expr)
@@ -124,15 +127,16 @@ def eval_expr(data, expr, var, vals, i):
                 offset += 1
         expr = "".join(elist)
 
-        for i in range(len(var)):
-            if (var[i] in expr):
-                temp = expr.replace(var[i], "%d")
-                expr = temp % vals[i]
+        for var in data.variables:
+            if var in expr:
+                num_occurences = expr.count(var)
+                temp = expr.replace(var, "%d")
+                expr = temp % ((data.variables[var],)*num_occurences)
     except Exception as e:
         print("Error:", e)
         data.error = True
         data.err_msg = "invalid variable name - should be %s" % var
-        data.err_line = i 
+        data.err_line = line_num
         return None
 
     try:
@@ -141,14 +145,14 @@ def eval_expr(data, expr, var, vals, i):
             if not(c.isspace() or c.isalpha() or c.isdigit() or c in safe_syms):
                 data.error = True
                 data.err_msg = "math syntax error"
-                data.err_line = i
+                data.err_line = line_num
                 return None    
         
         return eval(expr)
     except:
         data.error = True
         data.err_msg = "math syntax error"
-        data.err_line = i
+        data.err_line = line_num
         return None
 
 # strip but doesn't strip the beginning because indents are important
@@ -222,24 +226,25 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
         # print("processing line:", line)
         if line.startswith("x"):
             # if you can't split, then there's a syntax error
-            expr = line.split("<-")[1].strip()
-            val = eval_expr(data, expr, ["x"], [x1], i)
-            if val == None:
+            try:
+                expr = line.split("<-")[1].strip()
+            except:
                 data.error = True
-                data.err_msg = "assignment error"
-                data.err_line = i 
+                data.err_msg = "should be of the form \'x <- 5\'"
+                data.err_line = i
+            val = eval_expr(data, expr, i)
+            if val == None:
                 return None
+            data.variables['x'] = val
             x1 = val
 
         elif line.startswith("y"):
             # if you can't split, then there's a syntax error
             expr = line.split("<-")[1].strip()
-            val = eval_expr(data, expr, ["y"], [y1], i)
-            if val == None:
-                data.error = True
-                data.err_msg = "assignment error"
-                data.err_line = i  
-                return None # there was an error
+            val = eval_expr(data, expr, i)
+            if val == None: # there was an error
+                return None 
+            data.variables['y'] = val
             y1 = val
 
         elif line.startswith("color"):
@@ -249,6 +254,17 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                 data.err_msg = "should be of the form \'color <- black\'"
                 data.err_line = i
             color = line.split("<-")[1].strip() 
+        elif "<-" in line:
+            if (len(line.split("<-")) < 2):
+                data.error = True
+                data.err_msg = "should be of the form \'variable_name <- value\'"
+                data.err_line = i
+
+            (var, expr) = (line.split("<-")[0].strip(), line.split("<-")[1].strip())
+            res = eval_expr(data, expr, i)
+            if res == None:
+                return 
+            data.variables[var] = res
 
         elif line.startswith("draw"):
             if color != "none":
@@ -264,7 +280,7 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                 end = line.find(")")
                 expr = line[start + 1:end]
                 #DEFINE VAR AND VAL
-                cond = eval_expr(data, expr, ["x", "y"], [x1, y1], i)
+                cond = eval_expr(data, expr, i)
 
             except Exception as e:
                 print("here!")
@@ -312,17 +328,64 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
             else:
                 print("not cond")
             i = k - 1 # minus 1 because you ++ at end
+        elif line.startswith("while"):
+            cond = None
+            try: 
+                # get contents between parens
+                start = line.find("(")
+                end = line.find(")")
+                expr = line[start + 1:end]
+                #DEFINE VAR AND VAL
+                cond = eval_expr(data, expr, i)
+
+            except Exception as e:
+                data.error = True
+                data.err_msg = str(e)
+                print(e)
+                data.err_line = i 
+
+            (body, k) = get_indent_body(data, code_lines, i + 1)
+
+            while (cond or repeated):
+                if data.frames != []:
+                    result = interpret(data, "".join(body), *data.frames.pop())    
+                else: 
+                    result = interpret(data, "".join(body), 0, color, 0, x0, y0, x1, y1)
+                
+                if result == None and data.error: # error occured
+                    return 
+                (terminated, break_called, x0, y0, x1, y1, color) = result
+                cond = eval_expr(data, expr, i)
+                if break_called:
+                    
+                    if not cond and terminated:
+                        # repeated = 0
+                        print("we should be exiting the loop")
+                        print("k =", k)
+                        i = k
+                    
+                    # terminated keeps track of whether you've completed the inner loop or not
+                    # print("terminated: ", terminated)
+                    # if (terminated): repeated += 1
+                    frame = (i, color, int(not(terminated)), x0, y0, x1, y1)
+                    print("appending frame in while: ", frame)
+                    data.frames.append(frame)
+                    return (False, True, x0, y0, x1, y1, color)
 
         elif line.startswith("repeat"): 
             # get the number between the end of repeat and before the colon
-            # 6 because 6 letters in repeat
             try:
-                m = int(line.split(":")[0][len("repeat"):].strip())
+                expr = line.split(":")[0][len("repeat"):].strip()
+
             except Exception as e:
                 data.error = True
                 data.err_msg = str(e)
                 data.err_line = i 
                 return None
+
+            if data.to_repeat == None:
+                m = eval_expr(data, expr, i)
+                data.to_repeat = m
             
             print("before get_indent_body")
             print(i + 1)
@@ -338,8 +401,8 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                 data.err_line = k 
                 return None
 
-            # m - repeated to handle for breakpoints
-            for j in range(m - repeated):
+            # data.to_repeat - repeated to handle for breakpoints
+            for j in range(data.to_repeat - repeated):
     
                 if data.frames != []:
                     result = interpret(data, "".join(body), *data.frames.pop())    
@@ -351,7 +414,7 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
                 (terminated, break_called, x0, y0, x1, y1, color) = result
                 if break_called:
                     
-                    if j + 1 > m - repeated:
+                    if j + 1 > data.to_repeat - repeated:
                         print("we should be exiting the loop")
                         i = k
     
@@ -385,12 +448,11 @@ def interpret(data, code, i=0, color="", repeated=0, x0=0, y0=0, x1=0, y1=0):
             
             if (i + 1) == n:
                 return (True, True, x0, y0, x1, y1, color)
+            print("appending frame: ", frame)
             data.frames.append(frame)
             return (False, True, x0, y0, x1, y1, color)
 
-        elif "<-" in line:
-            (var, val) = (line.split("<-")[0], line.split("<-")[1])
-            data.custom_vars[var] = val 
+        
         else:
             # print some exception
             print("error:", repr(line))
@@ -480,7 +542,11 @@ def init_GUI(data):
     data.textbox = Textbox(textx, texty, textw, texth)
 
 def init_compile_data(data):
-    data.custom_vars = dict()
+    data.to_repeat = None 
+    data.variables = dict()
+    data.variables['x'] = 0
+    data.variables['y'] = 0
+    data.variables['color'] = None
     data.error = False
     data.err_msg = ""
     data.code = data.textbox.get_text()
@@ -540,7 +606,7 @@ def keyPressed(event, data):
     # use event.char and event.keysym
     
     if data.type_mode:
-        valid = "\<-+#:()^*/%=" 
+        valid = "\><-+#:()^*/%=" 
         if event.keysym == "Return":
             data.textbox.add_text("\n")
         elif event.keysym == "Tab":
@@ -555,17 +621,18 @@ def keyPressed(event, data):
 
     elif event.keysym == "Return":
         # when you break and then recompile something weird happens
-        data.custom_vars = dict()
-        data.error = False
-        data.err_msg = ""
-        data.code = data.textbox.get_text()
-        data.to_draw = []
-        data.frames = []
-        data.print_string = []
+        # data.custom_vars = dict()
+        # data.error = False
+        # data.err_msg = ""
+        # data.code = data.textbox.get_text()
+        # data.to_draw = []
+        # data.frames = []
+        # data.print_string = []
+        init_compile_data(data)
         code_lines = filter_space(data.code.splitlines(), data.debug_mode)
         data.code = "\n".join(code_lines)
         interpret(data, data.code)
-        # print("frame post return: ", data.frames)
+        print("frame post return: ", data.frames)
 
     # display axes
     elif event.char == "a":
@@ -599,7 +666,7 @@ def keyPressed(event, data):
         # TODO: DO STACK TRACE OF RECURSIVE CALLS FOR FOR LOOP
         while len(data.frames) > 0:
             frame = data.frames.pop()
-            print("frame:", frame)
+            print("popped frame:", frame)
             # transfer results from recursive call for next iteration
             result = interpret(data, data.code, *frame)
             if result == None: # an error occured
