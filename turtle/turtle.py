@@ -19,12 +19,26 @@ Current features:
   - TODO:
    - convert everything to data
    - self-check on drawing game
-   - super clear error handling
+    - super clear error handling
    - functions -> return values, confirm recursion works
    - range
    - confirm that debug-mode works correctly with fns
    - error handling <- uncomment all the excepts
+ 
 """
+
+#TODO: add undo, syntax highlighting, test functions
+#TODO: make it look like sublime
+#TODO: better save and load
+#TODO: make constants highlighted, don't make variables highlighted
+#TODO: make indent smaller
+
+# Begin writing interpreter for Adaas <- saada
+from tkinter import *
+#from Modules.numericStringParser import NumericStringParser 
+from tkinter.scrolledtext import *
+import tkinter
+import string
 
 # Begin writing interpreter for Adaas <- saada
 from tkinter import *
@@ -204,6 +218,7 @@ def strip_end(s):
         if not(slist[i - 1].isspace()):
             break
     return "".join(slist[:i])
+
 
 def test_strip_end():
     print("Testing strip_end...")
@@ -537,7 +552,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             for j in range(data.to_repeat - repeated):
     
                 if data.frames != []:
-                    result = interpret(data, "".join(body), *data.frames.pop(), depth+4)    
+                    result = interpret(data, "".join(body), *(data.frames.pop()), depth=depth+4)    
                 else: 
                     print(" "*depth + "line 415 variables: ", variables)
                     print("x0, y0", x0, y0)
@@ -655,12 +670,13 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
             return None
     
         i += 1
+
     print(" "*depth +"line 495 variables: ", variables)
     return (True, False, x0, y0, x1, y1, color, variables)
 
 def draw_code(canvas, data):
 
-    draw_window_height = data.height - data.draw_window_margin*2
+    draw_window_height = data.canvas_height - data.draw_window_margin*2
     cx = data.draw_window_margin + data.draw_window_width/2
     cy = data.draw_window_margin + draw_window_height/2
     for obj in data.to_draw:
@@ -678,10 +694,8 @@ def draw_code(canvas, data):
             data.err_line = i 
 
 def draw_axes(canvas, data):
-
-    
     offset = data.draw_window_margin
-    draw_window_height = data.height - offset*2
+    draw_window_height = data.canvas_height - offset*2
     cx = data.draw_window_margin + data.draw_window_width/2
     cy = data.draw_window_margin + draw_window_height/2
     
@@ -719,20 +733,14 @@ def draw_axes(canvas, data):
         canvas.create_line(mx_l, my_n, mx_r, my_n)
 
 def init_GUI(data):
-    data.draw_window_margin = 20
-    data.draw_window_width = data.width * 3/5
-    data.draw_window_height = data.height - data.draw_window_margin*2
+    data.draw_window_margin = 5
+    data.draw_window_width = data.canvas_width-data.draw_window_margin 
+    data.draw_window_height = data.canvas_height - data.draw_window_margin
     data.margin = 10
     data.draw_window_cx = data.draw_window_margin + data.draw_window_width/2
     data.draw_window_cy = data.draw_window_margin + data.draw_window_height/2
-    textx = data.draw_window_margin + data.draw_window_width + data.margin
-    texty = data.draw_window_margin
-    textw = (data.width - data.draw_window_width
-             - data.draw_window_margin*2 - data.margin)
-    texth = data.height - 2*data.draw_window_margin
     data.to_draw = []
     data.axes = False
-    data.textbox = Textbox(textx, texty, textw, texth)
 
 def init_compile_data(data):
     data.fns = dict()
@@ -761,32 +769,33 @@ def init(data):
     data.ver = None
     data.err_line = 0
     data.err_msg = ""
-    data.code = """x <- -25
-y <- 25
-color <- none
-draw
-y <- -25
-color <- black
-draw
-x<--25
-y<-0
-draw
-x<--5
-draw
-y<-25
-color<-none
-draw
-y<--25
-color<-black
-draw
-x<-5
-y<-25
-color<-none
-draw
-y<--25
-color<-blue
-draw
-"""
+    data.code = ""
+# """x <- -25
+# y <- 25
+# color <- none
+# draw
+# y <- -25
+# color <- black
+# draw
+# x<--25
+# y<-0
+# draw
+# x<--5
+# draw
+# y<-25
+# color<-none
+# draw
+# y<--25
+# color<-black
+# draw
+# x<-5
+# y<-25
+# color<-none
+# draw
+# y<--25
+# color<-blue
+# draw
+# """
     variables = dict()
     variables['x'] = 0
     variables['y'] = 0
@@ -794,84 +803,134 @@ draw
     interpret(data, data.code, variables)
 
 def mousePressed(event, data):
-    # use event.x and event.y
-    if data.textbox.in_bounds(event.x, event.y):
-        data.type_mode = True
-    else:
-        data.type_mode = False
+    pass
+    # widget = str(data.masterframe.winfo_containing(event.x_root, event.y_root))
+    # textid = str(data.textbox.winfo_name())
+    # if(textid in widget):
+    #     data.type_mode = True
+    #     data.textbox.enable()
+    # else:
+    #     data.type_mode = False
+    #     data.textbox.disable()
+
+def runcode(data):
+    init_compile_data(data)
+    code_lines = filter_space(data.code.splitlines(), data.debug_mode)
+    data.code = "\n".join(code_lines)
+    variables = dict()
+    variables['x'] = 0
+    variables['y'] = 0
+    variables['color'] = None
+    interpret(data, data.code, variables)
+    print("frame post return: ", data.frames)
+
+
+def savecode(data):
+    data.textbox.save(data.ver)
+    print("data saved")
+
+def loadcode(data):
+    data.textbox.load(data.ver)
+    print("data loaded")
+
+def clearcode(data):
+    print("clear code")
+    data.textbox.delete()
+
+def toggleaxes(data):
+    data.axes = not(data.axes)
+
+def toggledebug(data):
+    data.debug_mode = not(data.debug_mode)
+
+def stepdebug(data):
+    while len(data.frames) > 0:
+        frame = data.frames.pop()
+        print("popped frame:", frame)
+        # transfer results from recursive call for next iteration
+        # variables = frame[-1]
+        # frame = frame[:-1]
+        result = interpret(data, data.code, *frame)
+        if result == None: # an error occured
+            data.frames = []
+            return 
+        (_, break_called, x0, y0, x1, y1, color, variables) = result
+        if break_called:
+            print("frame post c: ", data.frames)
+            return
 
 def keyPressed(event, data):
+    pass
     # use event.char and event.keysym
     
-    if data.type_mode:
-        valid = "\><-+#:()^*/%=," 
-        if event.keysym == "Return":
-            data.textbox.add_text("\n")
-        elif event.keysym == "Tab":
-            data.textbox.add_text("    ")
-        elif event.keysym == "BackSpace":
-            data.textbox.backspace()
-        elif (event.char.isalpha() 
-             or event.char.isdigit() 
-             or event.char.isspace()
-             or event.char in valid):
-            data.textbox.add_text(event.char)
+    # if data.type_mode:
+    #     valid = "\><-+#:()^*/%=," 
+    #     if event.keysym == "Return":
+    #         data.textbox.add_text("\n")
+    #     elif event.keysym == "Tab":
+    #         data.textbox.add_text("    ")
+    #     elif event.keysym == "BackSpace":
+    #         data.textbox.backspace()
+    #     elif (event.char.isalpha() 
+    #          or event.char.isdigit() 
+    #          or event.char.isspace()
+    #          or event.char in valid):
+    #         data.textbox.add_text(event.char)
 
-    elif event.keysym == "Return":
-        init_compile_data(data)
-        code_lines = filter_space(data.code.splitlines(), data.debug_mode)
-        data.code = "\n".join(code_lines)
-        variables = dict()
-        variables['x'] = 0
-        variables['y'] = 0
-        variables['color'] = None
-        interpret(data, data.code, variables)
-        print("frame post return: ", data.frames)
+    # elif event.keysym == "Return":
+    #     init_compile_data(data)
+    #     code_lines = filter_space(data.code.splitlines(), data.debug_mode)
+    #     data.code = "\n".join(code_lines)
+    #     variables = dict()
+    #     variables['x'] = 0
+    #     variables['y'] = 0
+    #     variables['color'] = None
+    #     interpret(data, data.code, variables)
+    #     print("frame post return: ", data.frames)
 
     # display axes
-    elif event.char == "a":
-        data.axes = not(data.axes)
+    # elif event.char == "a":
+    #     data.axes = not(data.axes)
 
-    elif event.char == "d":
-        data.debug_mode = not(data.debug_mode)
+    # elif event.char == "d":
+    #     data.debug_mode = not(data.debug_mode)
 
-    elif event.char.isdigit():
-        ver = int(event.char)
-        if ver == 0:
-            data.ver = None
-        else:
-            data.ver = int(event.char)
+    # elif event.char.isdigit():
+    #     ver = int(event.char)
+    #     if ver == 0:
+    #         data.ver = None
+    #     else:
+    #         data.ver = int(event.char)
     # save code written
-    elif event.char == "s":
-        data.textbox.save(data.ver)
-        print("data saved")
+    # elif event.char == "s":
+    #     data.textbox.save(data.ver)
+    #     print("data saved")
 
-    # load previous code written
-    elif event.char == "l":
-        data.textbox.load(data.ver)
-        print("data loaded")
+    # # load previous code written
+    # elif event.char == "l":
+    #     data.textbox.load(data.ver)
+    #     print("data loaded")
 
-    # help
-    elif event.char == "h":
-        data.help = True
+    # # help
+    # elif event.char == "h":
+    #     data.help = True
 
     # continue after break point
-    elif event.char == "c":
-        while len(data.frames) > 0:
-            frame = data.frames.pop()
-            print("popped frame:", frame)
-            # transfer results from recursive call for next iteration
-            # variables = frame[-1]
-            # frame = frame[:-1]
-
-            result = interpret(data, data.code, *frame)
-            if result == None: # an error occured
-                data.frames = []
-                return 
-            (_, break_called, x0, y0, x1, y1, color, variables) = result
-            if break_called:
-                print("frame post c: ", data.frames)
-                return
+    # elif event.char == "c":
+    #     while len(data.frames) > 0:
+    #         frame = data.frames.pop()
+    #         print("popped frame:", frame)
+    #         # transfer results from recursive call for next iteration
+    #         # variables = frame[-1]
+    #         # frame = frame[:-1]
+    #         result = interpret(data, data.code, *frame)
+    #         if result == None: # an error occured
+    #             data.frames = []
+    #             return 
+    #         (_, break_called, x0, y0, x1, y1, color, variables) = result
+    #         if break_called:
+    #             print("frame post c: ", data.frames)
+    #             return
 
 
 def timerFired(data):
@@ -879,16 +938,20 @@ def timerFired(data):
 
 def draw_screens(canvas, data):
     canvas.create_rectangle(data.draw_window_margin, data.draw_window_margin,
-                            data.draw_window_margin + data.draw_window_width, 
-                            data.height - data.draw_window_margin, width=3)
-    data.textbox.draw(canvas, data.counter)
+                            data.canvas_width-data.draw_window_margin, 
+                           data.canvas_height, width=3)
+
+    data.console.create_rectangle(data.draw_window_margin, data.draw_window_margin,
+                            data.canvas_width-data.draw_window_margin, 
+                           data.canvas_height, width=3)
+
 
 def redrawAll(canvas, data):
 
     draw_screens(canvas, data)
 
     if data.debug_mode:
-        canvas.create_text(data.draw_window_margin + data.margin,
+        data.console.create_text(data.draw_window_margin + data.margin,
                            data.draw_window_margin + data.draw_window_height,
                            text="Debug Mode",
                            anchor=SW)
@@ -897,19 +960,166 @@ def redrawAll(canvas, data):
     
     if data.error:
         err_msg = "Error on line %d: %s" % (data.err_line, data.err_msg)
-        canvas.create_text(data.draw_window_margin + data.margin, 
+        data.console.create_text(data.draw_window_margin + data.margin, 
                            data.draw_window_margin + data.margin, 
                            text=err_msg, anchor=NW)
     else:
         draw_code(canvas, data)
         p = "\n".join(data.print_string)
-        canvas.create_text(data.draw_window_margin + data.margin,
+        data.console.create_text(data.draw_window_margin + data.margin,
                            data.draw_window_margin + data.margin,
                            text=p, anchor=NW)
 
-def run(width=1000, height=600):
+#http://stackoverflow.com/questions/16369470/tkinter-adding-line-number-to-text-widget
+class TextLineNumbers(tkinter.Canvas):
+    def __init__(self, *args, **kwargs):
+        tkinter.Canvas.__init__(self, *args, **kwargs)
+        self.textwidget = None
+
+    def attach(self, text_widget):
+        self.textwidget = text_widget
+
+    def redraw(self, *args):
+        '''redraw line numbers'''
+        self.delete("all")
+
+        i = self.textwidget.index("@0,0")
+        while True :
+            dline= self.textwidget.dlineinfo(i)
+            if dline is None: break
+            y = dline[1]
+            linenum = str(i).split(".")[0]
+            self.create_text(2,y,anchor="nw", text=linenum)
+            i = self.textwidget.index("%s+1line" % i)
+
+class CustomText(tkinter.Text):
+    def __init__(self, *args, **kwargs):
+        tkinter.Text.__init__(self, *args, **kwargs)
+
+        self.tk.eval('''
+            proc widget_proxy {widget widget_command args} {
+
+                # call the real tk widget command with the real args
+                set result [uplevel [linsert $args 0 $widget_command]]
+
+                # generate the event for certain types of commands
+                if {([lindex $args 0] in {insert replace delete}) ||
+                    ([lrange $args 0 2] == {mark set insert}) || 
+                    ([lrange $args 0 1] == {xview moveto}) ||
+                    ([lrange $args 0 1] == {xview scroll}) ||
+                    ([lrange $args 0 1] == {yview moveto}) ||
+                    ([lrange $args 0 1] == {yview scroll})} {
+
+                    event generate  $widget <<Change>> -when tail
+                }
+
+                # return the result from the real widget command
+                return $result
+            }
+            ''')
+        self.tk.eval('''
+            rename {widget} _{widget}
+            interp alias {{}} ::{widget} {{}} widget_proxy {widget} _{widget}
+        '''.format(widget=str(self)))
+
+class CustomTextBox(tkinter.Frame):
+    def __init__(self, *args, **kwargs):
+        tkinter.Frame.__init__(self, *args, **kwargs)
+        self.text = CustomText(self)
+        self.vsb = tkinter.Scrollbar(orient="vertical", command=self.text.yview)
+        self.text.configure(yscrollcommand=self.vsb.set, font=("Helvetica", "18", "bold"))
+        self.linenumbers = TextLineNumbers(self, width=30)
+        self.linenumbers.attach(self.text)
+
+        self.vsb.pack(side="right", fill="y")
+        self.linenumbers.pack(side="left", fill="y")
+        self.text.pack(side="right", fill="both", expand=True)
+
+        self.text.bind("<<Change>>", self._on_change)
+        self.text.bind("<Configure>", self._on_change)
+
+        self.text.tag_configure("global", foreground="purple")
+        self.text.tag_configure("keyword", foreground="blue")
+        self.text.tag_configure("debug", foreground="red")
+
+        self.globals = ["x", "y", "color"]
+        self.keywords = ["if", "while", "repeat", "def"]
+        self.debug = ["break", "print"]
+
+
+    def _on_change(self, event):
+        self.linenumbers.redraw()
+
+    def get_text(self):
+        text = self.text.get("1.0",'end-1c')
+        return text
+
+    def save(self, ver=None):
+        contents = self.get_text()
+        if ver == None:
+            writeFile("code.txt", contents)
+        else:
+            filename = "code%d.txt" % ver
+            writeFile(filename, contents)
+
+    def load(self, ver=None):
+        if ver == None:
+            contents = readFile("code.txt")
+        else:
+            filename = "code%d.txt" % ver
+            contents = readFile(filename)
+        self.enable()
+        self.text.insert("end",contents)
+    
+    def delete(self):
+        self.text.delete('1.0', END)
+
+    def disable(self):
+        print("disable")
+        self.text.configure(state="disabled")
+
+    def enable(self):
+        print("enable")
+        self.text.configure(state="normal")
+        #TODO: fix select text
+
+    def color(self):
+        print("the text", self.text.get("1.0", END))
+        text = self.text.get("1.0", END)
+        r = 1
+        c = 0
+        #rows start at 1 and columns start at 0 *_*
+        #coordinate is row.col
+        for line in text.splitlines():
+            print(line.split())
+            line = line.strip()
+            c = 0
+            for word in line.split():
+                while(c < len(line) and line[c] in string.whitespace):
+                    c += 1
+                initc = "%d.%d" %(r, c)
+                endc = "%d.%d" % (r, c + len(word))
+                word = self.text.get(initc, endc)
+                c += len(word) #1 for the space
+
+                #remove  old tags
+                for tag in self.text.tag_names():
+                    self.text.tag_remove(tag, initc, endc)
+
+                #apply tags
+                if word in self.globals:
+                    self.text.tag_add("global", initc, endc)
+                elif word in self.keywords:
+                    self.text.tag_add("keyword", initc, endc)
+                elif word in self.debug:
+                    self.text.tag_add("debug", initc, endc)
+            r += 1
+
+
+def run(width=1500, height=600):
     def redrawAllWrapper(canvas, data):
         canvas.delete(ALL)
+        data.console.delete(ALL)
         redrawAll(canvas, data)
         canvas.update()    
 
@@ -926,20 +1136,60 @@ def run(width=1000, height=600):
         redrawAllWrapper(canvas, data)
         # pause, then call timerFired again
         canvas.after(data.timerDelay, timerFiredWrapper, canvas, data)
+
     # Set up data and call init
     class Struct(object): pass
     data = Struct()
     data.width = width
     data.height = height
     data.timerDelay = 100 # milliseconds
-    init(data)
+    data.textbox_width = width//2
+    data.canvas_width = width - data.textbox_width
+    data.canvas_height = height//2
     # create the root and the canvas
     root = Tk()
-    canvas = Canvas(root, width=data.width, height=data.height)
-    canvas.pack()
+    #master frame = left half of the screen
+    data.masterframe = Frame(root, width = width, height= height)
+    data.masterframe.pack(side="left")
+
+    data.textbox = CustomTextBox(data.masterframe, width = data.textbox_width, height = height)
+    data.textbox.pack(fill="both", expand = True)
+
+    runButton = Button(data.masterframe, text="Run", command= lambda: runcode(data))
+    runButton.pack(side="left", padx = 15, pady = 10)
+
+    saveButton = Button(data.masterframe, text="Save", command= lambda: savecode(data))
+    saveButton.pack(side="left", padx = 15, pady = 10)
+
+    loadButton = Button(data.masterframe, text="Load", command= lambda: loadcode(data))
+    loadButton.pack(side="left", padx = 15, pady = 10)
+
+    clearButton = Button(data.masterframe, text="Clear", command= lambda: clearcode(data))
+    clearButton.pack(side="left", padx = 15, pady = 10)
+
+    axesButton = Button(data.masterframe, text="Toggle Axes", command= lambda: toggleaxes(data))
+    axesButton.pack(side="left", padx = 15, pady = 10)
+
+    debugButton = Button(data.masterframe, text="Toggle Debug", command= lambda: toggledebug(data))
+    debugButton.pack(side="left", padx = 15, pady = 10)
+
+    stepButton = Button(data.masterframe, text="Step", command= lambda: stepdebug(data))
+    stepButton.pack(side="left", padx = 15, pady = 10)
+
+    #subframe = right half of the screen
+    data.subframe = Frame(root, width = data.canvas_width, height= height)
+    data.subframe.pack(side="left")
+
+    canvas = Canvas(data.subframe, width = data.canvas_width, height = data.canvas_height)
+    canvas.pack(side="top", fill="both", expand = True)
+
+    data.console = Canvas(data.subframe, width = data.canvas_width, height = data.canvas_height)
+    data.console.pack(side="bottom", fill="both", expand = True)
+    init(data)
+
     # set up events
     root.bind("<Button-1>", lambda event:
-                            mousePressedWrapper(event, canvas, data))
+                            mousePressedWrapper(event, canvas, data))    
     root.bind("<Key>", lambda event:
                             keyPressedWrapper(event, canvas, data))
     timerFiredWrapper(canvas, data)
@@ -957,4 +1207,4 @@ def test_all():
     print("...passed!")
 
 test_all()
-run(500, 400)
+run(900, 600)
