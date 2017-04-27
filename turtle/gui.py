@@ -19,11 +19,18 @@ Current features:
  
 """
 
+#TODO: add undo, syntax highlighting, test functions
+#TODO: make it look like sublime
+#TODO: better save and load
+#TODO: make constants highlighted, don't make variables highlighted
+#TODO: make indent smaller
+
 # Begin writing interpreter for Adaas
 from tkinter import *
 #from Modules.numericStringParser import NumericStringParser 
 from tkinter.scrolledtext import *
 import tkinter
+import string
 
 # taken from http://www.kosbie.net/cmu/fall-14/15-112/notes/file-and-web-io.py
 def readFile(filename, mode="rt"):
@@ -43,7 +50,6 @@ def writeFile(filename, contents, mode="wt"):
 # vals is a list of values corresponding to the appropriate index of var
 # i is the line number 
 def eval_expr(data, expr, var, vals, i):
-
     try:
         elist = list(expr)
         offset = 0
@@ -531,57 +537,7 @@ def stepdebug(data):
             return
 
 def keyPressed(event, data):
-    pass
-    # # use event.char and event.keysym
-    
-    # if data.type_mode:
-    #     pass
-    # elif event.keysym == "Return":
-    #     run(data)
-
-    # # display axes
-    # elif event.char == "a":
-    #     data.axes = not(data.axes)
-
-    # elif event.char == "d":
-    #     data.debug_mode = not(data.debug_mode)
-
-    # elif event.char.isdigit():
-    #     ver = int(event.char)
-    #     if ver == 0:
-    #         data.ver = None
-    #     else:
-    #         data.ver = int(event.char)
-    # # save code written
-    # elif event.char == "s":
-    #     data.textbox.save(data.ver)
-    #     print("data saved")
-
-    # # load previous code written
-    # elif event.char == "l":
-    #     data.textbox.load(data.ver)
-    #     print("data loaded")
-
-    # # help
-    # elif event.char == "h":
-    #     data.help = True
-
-    # # continue after break point
-    # elif event.char == "c":
-    #     # TODO: DO STACK TRACE OF RECURSIVE CALLS FOR FOR LOOP
-    #     while len(data.frames) > 0:
-    #         frame = data.frames.pop()
-    #         print("frame:", frame)
-    #         # transfer results from recursive call for next iteration
-    #         result = interpret(data, data.code, *frame)
-    #         if result == None: # an error occured
-    #             data.frames = []
-    #             return 
-    #         (_, break_called, x0, y0, x1, y1, color) = result
-    #         if break_called:
-    #             print("frame post c: ", data.frames)
-    #             return
-
+    data.textbox.color()
 
 def timerFired(data):
     data.counter += 1
@@ -676,8 +632,7 @@ class CustomTextBox(tkinter.Frame):
         tkinter.Frame.__init__(self, *args, **kwargs)
         self.text = CustomText(self)
         self.vsb = tkinter.Scrollbar(orient="vertical", command=self.text.yview)
-        self.text.configure(yscrollcommand=self.vsb.set)
-        self.text.tag_configure("bigfont", font=("Helvetica", "24", "bold"))
+        self.text.configure(yscrollcommand=self.vsb.set, font=("Helvetica", "18", "bold"))
         self.linenumbers = TextLineNumbers(self, width=30)
         self.linenumbers.attach(self.text)
 
@@ -687,6 +642,14 @@ class CustomTextBox(tkinter.Frame):
 
         self.text.bind("<<Change>>", self._on_change)
         self.text.bind("<Configure>", self._on_change)
+
+        self.text.tag_configure("global", foreground="purple")
+        self.text.tag_configure("keyword", foreground="blue")
+        self.text.tag_configure("debug", foreground="red")
+
+        self.globals = ["x", "y", "color"]
+        self.keywords = ["if", "while", "repeat", "def"]
+        self.debug = ["break", "print"]
 
 
     def _on_change(self, event):
@@ -724,6 +687,38 @@ class CustomTextBox(tkinter.Frame):
         print("enable")
         self.text.configure(state="normal")
         #TODO: fix select text
+
+    def color(self):
+        print("the text", self.text.get("1.0", END))
+        text = self.text.get("1.0", END)
+        r = 1
+        c = 0
+        #rows start at 1 and columns start at 0 *_*
+        #coordinate is row.col
+        for line in text.splitlines():
+            print(line.split())
+            line = line.strip()
+            c = 0
+            for word in line.split():
+                while(c < len(line) and line[c] in string.whitespace):
+                    c += 1
+                initc = "%d.%d" %(r, c)
+                endc = "%d.%d" % (r, c + len(word))
+                word = self.text.get(initc, endc)
+                c += len(word) #1 for the space
+
+                #remove  old tags
+                for tag in self.text.tag_names():
+                    self.text.tag_remove(tag, initc, endc)
+
+                #apply tags
+                if word in self.globals:
+                    self.text.tag_add("global", initc, endc)
+                elif word in self.keywords:
+                    self.text.tag_add("keyword", initc, endc)
+                elif word in self.debug:
+                    self.text.tag_add("debug", initc, endc)
+            r += 1
 
 
 def run(width=1500, height=600):
