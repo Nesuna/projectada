@@ -27,18 +27,27 @@ Current features:
  
 """
 
-#TODO: add undo, syntax highlighting, test functions
-#TODO: make it look like sublime
+"""
+#TODO: integrate notebook tabs
+#TODO: add key shortcuts 
 #TODO: better save and load
-#TODO: make constants highlighted, don't make variables highlighted
-#TODO: make indent smaller
+
+---------
+#TODO: add undo
+#TODO: in debug mode, highlight the line
+#TODO: add horizontal scroll
+#TODO: make program executable (windows)
+#TODO: zoom in and out
+"""
 
 # Begin writing interpreter for Adaas <- saada
-from tkinter import *
+#from tkinter import *
 #from Modules.numericStringParser import NumericStringParser 
 from tkinter.scrolledtext import *
 import tkinter
 import string
+from tkinter import filedialog
+
 
 # Begin writing interpreter for Adaas <- saada
 from tkinter import *
@@ -110,6 +119,10 @@ class Textbox(object):
         return "".join(self.text)
 
     def save(self, ver=None):
+        # print("save")
+        # filename =  filedialog.asksaveasfilename(initialdir = "/",title = "Select file")
+        # writeFile(filename, contents)
+
         contents = self.get_text()
         if ver == None:
             writeFile("code.txt", contents)
@@ -118,6 +131,13 @@ class Textbox(object):
             writeFile(filename, contents)
 
     def load(self, ver=None):
+        # print("load")
+        # filename =  filedialog.askopenfilename(initialdir = "/",title = "Select file")
+        # print(filename)
+        # contents = readFile(filename)
+        # self.text = list(contents)
+        # self.index = len(self.text)
+
         if ver == None:
             contents = readFile("code.txt")
         else:
@@ -703,7 +723,7 @@ def draw_axes(canvas, data):
     canvas.create_line(offset, 
                        cy,
                        offset + data.draw_window_width,
-                       cy)
+                       cy, fill=data.outcolor)
 
     # divide into chunks of 10 rounded down to the nearest even
     interval = 10
@@ -716,12 +736,13 @@ def draw_axes(canvas, data):
         mx_n = cx - interval*i
         my_top = cy - marker_radius
         my_bot = cy + marker_radius
-        canvas.create_line(mx, my_top, mx, my_bot)
-        canvas.create_line(mx_n, my_top, mx_n, my_bot)
+        canvas.create_line(mx, my_top, mx, my_bot,fill=data.outcolor)
+        canvas.create_line(mx_n, my_top, mx_n, my_bot,fill=data.outcolor)
 
     # draw y axis
     canvas.create_line(cx, data.draw_window_margin, cx, 
-                       data.draw_window_margin + draw_window_height)
+                       data.draw_window_margin + draw_window_height,
+                       fill=data.outcolor)
 
     increments_y = draw_window_height//interval//2*2
     for i in range(1, int(increments_y//2 + 1)):
@@ -729,8 +750,8 @@ def draw_axes(canvas, data):
         mx_r = cx + marker_radius
         my = cy + interval*i
         my_n = cy - interval*i
-        canvas.create_line(mx_l, my, mx_r, my)
-        canvas.create_line(mx_l, my_n, mx_r, my_n)
+        canvas.create_line(mx_l, my, mx_r, my, fill=data.outcolor)
+        canvas.create_line(mx_l, my_n, mx_r, my_n, fill=data.outcolor)
 
 def init_GUI(data):
     data.draw_window_margin = 5
@@ -860,7 +881,8 @@ def stepdebug(data):
             return
 
 def keyPressed(event, data):
-    pass
+    data.textbox.color()
+
     # use event.char and event.keysym
     
     # if data.type_mode:
@@ -947,8 +969,7 @@ def draw_screens(canvas, data):
 
 
 def redrawAll(canvas, data):
-
-    draw_screens(canvas, data)
+    #draw_screens(canvas, data)
 
     if data.debug_mode:
         data.console.create_text(data.draw_window_margin + data.margin,
@@ -975,6 +996,7 @@ class TextLineNumbers(tkinter.Canvas):
     def __init__(self, *args, **kwargs):
         tkinter.Canvas.__init__(self, *args, **kwargs)
         self.textwidget = None
+        self.color = "#8f908a"
 
     def attach(self, text_widget):
         self.textwidget = text_widget
@@ -989,7 +1011,7 @@ class TextLineNumbers(tkinter.Canvas):
             if dline is None: break
             y = dline[1]
             linenum = str(i).split(".")[0]
-            self.create_text(2,y,anchor="nw", text=linenum)
+            self.create_text(2,y,anchor="nw", text=linenum, fill= self.color)
             i = self.textwidget.index("%s+1line" % i)
 
 class CustomText(tkinter.Text):
@@ -1027,25 +1049,36 @@ class CustomTextBox(tkinter.Frame):
         tkinter.Frame.__init__(self, *args, **kwargs)
         self.text = CustomText(self)
         self.vsb = tkinter.Scrollbar(orient="vertical", command=self.text.yview)
-        self.text.configure(yscrollcommand=self.vsb.set, font=("Helvetica", "18", "bold"))
+        bg = "#272822"
+        outcolor = "#505050"
+        highcolor ="#49483e"
+        self.text.configure(yscrollcommand=self.vsb.set, font=("Menlo-Regular", "14"),
+            background=bg, fg ="white", highlightbackground = outcolor,
+            highlightthickness = 0.5, selectbackground= highcolor)
         self.linenumbers = TextLineNumbers(self, width=30)
         self.linenumbers.attach(self.text)
+        self.linenumbers.config(background=bg, highlightthickness = 0)
 
         self.vsb.pack(side="right", fill="y")
         self.linenumbers.pack(side="left", fill="y")
         self.text.pack(side="right", fill="both", expand=True)
 
         self.text.bind("<<Change>>", self._on_change)
-        self.text.bind("<Configure>", self._on_change)
+        self.text.bind("<Configure>", self._on_change) 
+        self.text.bind("<Tab>", self.insert_tab) # BUG WITH TAB IF NO INIT
+        
+        self.debugcolor ="#c52672"
+        self.keycolor = "#66d9ef"
+        self.text.tag_configure("keyword", foreground=self.keycolor)
+        self.text.tag_configure("debug", foreground=self.debugcolor)
 
-        self.text.tag_configure("global", foreground="purple")
-        self.text.tag_configure("keyword", foreground="blue")
-        self.text.tag_configure("debug", foreground="red")
-
-        self.globals = ["x", "y", "color"]
         self.keywords = ["if", "while", "repeat", "def"]
         self.debug = ["break", "print"]
 
+    def insert_tab(self, event):
+        # insert 4 spaces
+        self.text.insert(INSERT, " " * 4)
+        return 'break'
 
     def _on_change(self, event):
         self.linenumbers.redraw()
@@ -1055,6 +1088,10 @@ class CustomTextBox(tkinter.Frame):
         return text
 
     def save(self, ver=None):
+        # print("save")
+        # filename =  filedialog.asksaveasfilename(initialdir = "/",title = "Select file")
+        # writeFile(filename, contents)
+
         contents = self.get_text()
         if ver == None:
             writeFile("code.txt", contents)
@@ -1063,6 +1100,11 @@ class CustomTextBox(tkinter.Frame):
             writeFile(filename, contents)
 
     def load(self, ver=None):
+        # print("load")
+        # filename =  filedialog.askopenfilename(initialdir = "/",title = "Select file")
+        # contents = readFile(filename)
+        # self.text = list(contents)
+        # self.index = len(self.text)
         if ver == None:
             contents = readFile("code.txt")
         else:
@@ -1070,6 +1112,7 @@ class CustomTextBox(tkinter.Frame):
             contents = readFile(filename)
         self.enable()
         self.text.insert("end",contents)
+        self.color()
     
     def delete(self):
         self.text.delete('1.0', END)
@@ -1087,34 +1130,71 @@ class CustomTextBox(tkinter.Frame):
         print("the text", self.text.get("1.0", END))
         text = self.text.get("1.0", END)
         r = 1
-        c = 0
         #rows start at 1 and columns start at 0 *_*
         #coordinate is row.col
         for line in text.splitlines():
-            print(line.split())
-            line = line.strip()
             c = 0
-            for word in line.split():
-                while(c < len(line) and line[c] in string.whitespace):
-                    c += 1
-                initc = "%d.%d" %(r, c)
-                endc = "%d.%d" % (r, c + len(word))
-                word = self.text.get(initc, endc)
-                c += len(word) #1 for the space
+            while(c < len(line)):
+                char = line[c]
+                if(char not in string.whitespace):
+                    initc = "%d.%d" %(r, c)
+                    while(c<len(line)-1 and line[c+1] not in string.whitespace):
+                        print("finding word", char, c)
+                        c+=1
+                        char = line[c]
+                    print("end c ", c)
+                    endc = "%d.%d" % (r, c+1)
+                    word = self.text.get(initc, endc)
+                    print("word", word, initc,endc)
+                    #remove  old tags
+                    for tag in self.text.tag_names():
+                        self.text.tag_remove(tag, initc, endc)
 
-                #remove  old tags
-                for tag in self.text.tag_names():
-                    self.text.tag_remove(tag, initc, endc)
+                    #apply tags
+                    if word in self.keywords:
+                        self.text.tag_add("keyword", initc, endc)
+                    elif word in self.debug:
+                        self.text.tag_add("debug", initc, endc)
+                c+= 1
+            r+=1
 
-                #apply tags
-                if word in self.globals:
-                    self.text.tag_add("global", initc, endc)
-                elif word in self.keywords:
-                    self.text.tag_add("keyword", initc, endc)
-                elif word in self.debug:
-                    self.text.tag_add("debug", initc, endc)
-            r += 1
 
+def on_quit(): sys.exit(0)
+
+def createmenu(root, data):
+    # create a menu for the menubar and associate it
+    # with the window
+    menubar = tkinter.Menu()
+    root.configure(menu=menubar)
+
+    # create a File menu and add it to the menubar
+    file_menu = tkinter.Menu(menubar, tearoff=False)
+    menubar.add_cascade(label="File", menu=file_menu)
+    file_menu.add_command(label="Save", command=lambda: savecode(data))
+    file_menu.add_command(label="Load", command=lambda: loadcode(data))
+
+    edit_menu = tkinter.Menu(menubar, tearoff=False)
+    menubar.add_cascade(label="Edit", menu=edit_menu)
+    edit_menu.add_cascade(label="Clear", command=lambda: clearcode(data))
+
+    tools_menu = tkinter.Menu(menubar, tearoff=False)
+    menubar.add_cascade(label="Tools", menu=tools_menu)
+    tools_menu.add_cascade(label="Run", command=lambda: runcode(data))
+    tools_menu.add_cascade(label="Toggle Axes", command=lambda: toggleaxes(data))
+    tools_menu.add_cascade(label="Toggle Debug", command=lambda: toggledebug(data))
+    tools_menu.add_cascade(label="Step", command=lambda: debugstep(data))
+
+    # # create a Edit menu and add it to the menubar
+    # edit_menu = tkinter.Menu(self.menubar, tearoff=False)
+    # menubar.add_cascade(label="Edit", menu=edit_menu)
+    # edit_menu.add_command(label="Cut", underline=2, command=on_cut)
+    # edit_menu.add_command(label="Copy", underline=0, command=on_copy)
+    # edit_menu.add_command(label="Paste", underline=0, command=on_paste)
+
+    # # create a View menu and add it to the menubar
+    # view_menu = tkinter.Menu(menubar, tearoff=False)
+    # menubar.add_cascade(label="View", menu=view_menu)
+    # view_menu.add_cascade(label="Whatever", command=on_whatever)
 
 def run(width=1500, height=600):
     def redrawAllWrapper(canvas, data):
@@ -1146,45 +1226,62 @@ def run(width=1500, height=600):
     data.textbox_width = width//2
     data.canvas_width = width - data.textbox_width
     data.canvas_height = height//2
+    data.bg = "#272822"
+    data.outcolor ="#505050"
+    data.outthick = 0.5
     # create the root and the canvas
     root = Tk()
+    root.configure(bg=data.bg)
+
+    # create menu
+    createmenu(root, data)
+
+
     #master frame = left half of the screen
     data.masterframe = Frame(root, width = width, height= height)
-    data.masterframe.pack(side="left")
+    data.masterframe.pack(side="left", fill="both", expand = True)
 
-    data.textbox = CustomTextBox(data.masterframe, width = data.textbox_width, height = height)
+    # runButton = Button(data.masterframe, text="Run", command= lambda: runcode(data))
+    # runButton.config(highlightbackground = data.bg)
+
+    # runButton.pack(side="left", padx = 15, pady = 10)
+
+    # saveButton = Button(data.masterframe, text="Save", command= lambda: savecode(data), bg=data.bg)
+    # saveButton.pack(side="left", padx = 15, pady = 10)
+
+    # loadButton = Button(data.masterframe, text="Load", command= lambda: loadcode(data), bg=data.bg)
+    # loadButton.pack(side="left", padx = 15, pady = 10)
+
+    # clearButton = Button(data.masterframe, text="Clear", command= lambda: clearcode(data), bg=data.bg)
+    # clearButton.pack(side="left", padx = 15, pady = 10)
+
+    # axesButton = Button(data.masterframe, text="Toggle Axes", command= lambda: toggleaxes(data), bg=data.bg)
+    # axesButton.pack(side="left", padx = 15, pady = 10)
+
+    # debugButton = Button(data.masterframe, text="Toggle Debug", command= lambda: toggledebug(data), bg=data.bg)
+    # debugButton.pack(side="left", padx = 15, pady = 10)
+
+    # stepButton = Button(data.masterframe, text="Step", command= lambda: stepdebug(data), bg=data.bg)
+    # stepButton.pack(side="left", padx = 15, pady = 10)
+
+    data.textbox = CustomTextBox(data.masterframe, width = data.textbox_width, 
+        height = height)
     data.textbox.pack(fill="both", expand = True)
-
-    runButton = Button(data.masterframe, text="Run", command= lambda: runcode(data))
-    runButton.pack(side="left", padx = 15, pady = 10)
-
-    saveButton = Button(data.masterframe, text="Save", command= lambda: savecode(data))
-    saveButton.pack(side="left", padx = 15, pady = 10)
-
-    loadButton = Button(data.masterframe, text="Load", command= lambda: loadcode(data))
-    loadButton.pack(side="left", padx = 15, pady = 10)
-
-    clearButton = Button(data.masterframe, text="Clear", command= lambda: clearcode(data))
-    clearButton.pack(side="left", padx = 15, pady = 10)
-
-    axesButton = Button(data.masterframe, text="Toggle Axes", command= lambda: toggleaxes(data))
-    axesButton.pack(side="left", padx = 15, pady = 10)
-
-    debugButton = Button(data.masterframe, text="Toggle Debug", command= lambda: toggledebug(data))
-    debugButton.pack(side="left", padx = 15, pady = 10)
-
-    stepButton = Button(data.masterframe, text="Step", command= lambda: stepdebug(data))
-    stepButton.pack(side="left", padx = 15, pady = 10)
 
     #subframe = right half of the screen
     data.subframe = Frame(root, width = data.canvas_width, height= height)
     data.subframe.pack(side="left")
+    data.subframe.configure(bg=data.bg)
 
     canvas = Canvas(data.subframe, width = data.canvas_width, height = data.canvas_height)
     canvas.pack(side="top", fill="both", expand = True)
+    canvas.configure(highlightbackground = data.outcolor, 
+        highlightthickness = data.outthick)
 
     data.console = Canvas(data.subframe, width = data.canvas_width, height = data.canvas_height)
     data.console.pack(side="bottom", fill="both", expand = True)
+    data.console.configure(bg=data.bg, highlightbackground = data.outcolor, 
+        highlightthickness = data.outthick)
     init(data)
 
     # set up events
