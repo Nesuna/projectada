@@ -26,20 +26,6 @@ Current features:
    - error handling <- uncomment all the excepts
  
 """
-
-"""
-#TODO: integrate notebook tabs
-#TODO: add key shortcuts 
-#TODO: better save and load
-
----------
-#TODO: add undo
-#TODO: in debug mode, highlight the line
-#TODO: add horizontal scroll
-#TODO: make program executable (windows)
-#TODO: zoom in and out
-"""
-
 # Begin writing interpreter for Adaas <- saada
 #from tkinter import *
 #from Modules.numericStringParser import NumericStringParser 
@@ -64,87 +50,6 @@ def writeFile(filename, contents, mode="wt"):
     # wt = "write text"
     with open(filename, mode) as fout:
         fout.write(contents)
-
-class Textbox(object):
-
-    def __init__(self, x, y, width, height):
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
-        self.text = []
-        self.clicked = False
-        self.index=0
-
-    def in_bounds(self, x, y):
-        if ((self.x <= x <= self.x + self.width) and
-                 (self.y <= y <= self.y + self.height)):
-            self.clicked = True
-            return True
-        self.clicked = False
-        return False
-    
-    def add_text(self, c):
-        self.text.insert(self.index, c)
-        self.index+=1
-
-    def move_index(self, delta):
-        if self.index + delta < 0 or self.index + delta >= len(self.text):
-            return
-        self.index += delta
-
-    def backspace(self):
-        if len(self.text) > 0:
-            self.text.pop()
-
-    def draw(self, canvas, counter=0):
-        canvas.create_rectangle(self.x, self.y, 
-                                self.x + self.width, 
-                                self.y +self.height, 
-                                width=3)
-        margin = 10
-        if counter % 10 < 5 and self.clicked:
-            
-            self.text.append("|")
-            canvas.create_text(self.x + margin, self.y + margin, 
-                text="".join(self.text), 
-                anchor=NW, font="14")
-            self.text.pop()
-        else:
-            canvas.create_text(self.x + margin, self.y + margin, 
-                text="".join(self.text), 
-                anchor=NW)
-
-    def get_text(self):
-        return "".join(self.text)
-
-    def save(self, ver=None):
-        # print("save")
-        # filename =  filedialog.asksaveasfilename(initialdir = "/",title = "Select file")
-        # writeFile(filename, contents)
-
-        contents = self.get_text()
-        if ver == None:
-            writeFile("code.txt", contents)
-        else:
-            filename = "code%d.txt" % ver
-            writeFile(filename, contents)
-
-    def load(self, ver=None):
-        # print("load")
-        # filename =  filedialog.askopenfilename(initialdir = "/",title = "Select file")
-        # print(filename)
-        # contents = readFile(filename)
-        # self.text = list(contents)
-        # self.index = len(self.text)
-
-        if ver == None:
-            contents = readFile("code.txt")
-        else:
-            filename = "code%d.txt" % ver
-            contents = readFile(filename)
-        self.text = list(contents)
-        self.index = len(self.text)
 
 # helper function that replaces variable name in expression 
 # with the variables actual value
@@ -791,32 +696,6 @@ def init(data):
     data.err_line = 0
     data.err_msg = ""
     data.code = ""
-# """x <- -25
-# y <- 25
-# color <- none
-# draw
-# y <- -25
-# color <- black
-# draw
-# x<--25
-# y<-0
-# draw
-# x<--5
-# draw
-# y<-25
-# color<-none
-# draw
-# y<--25
-# color<-black
-# draw
-# x<-5
-# y<-25
-# color<-none
-# draw
-# y<--25
-# color<-blue
-# draw
-# """
     variables = dict()
     variables['x'] = 0
     variables['y'] = 0
@@ -825,16 +704,9 @@ def init(data):
 
 def mousePressed(event, data):
     pass
-    # widget = str(data.masterframe.winfo_containing(event.x_root, event.y_root))
-    # textid = str(data.textbox.winfo_name())
-    # if(textid in widget):
-    #     data.type_mode = True
-    #     data.textbox.enable()
-    # else:
-    #     data.type_mode = False
-    #     data.textbox.disable()
 
 def runcode(data):
+    print("runningf")
     init_compile_data(data)
     code_lines = filter_space(data.code.splitlines(), data.debug_mode)
     data.code = "\n".join(code_lines)
@@ -849,6 +721,10 @@ def runcode(data):
 def savecode(data):
     data.textbox.save(data.ver)
     print("data saved")
+
+def saveascode(data):
+    data.textbox.saveas()
+    print("data saved as")
 
 def loadcode(data):
     data.textbox.load(data.ver)
@@ -883,78 +759,6 @@ def stepdebug(data):
 def keyPressed(event, data):
     data.textbox.color()
 
-    # use event.char and event.keysym
-    
-    # if data.type_mode:
-    #     valid = "\><-+#:()^*/%=," 
-    #     if event.keysym == "Return":
-    #         data.textbox.add_text("\n")
-    #     elif event.keysym == "Tab":
-    #         data.textbox.add_text("    ")
-    #     elif event.keysym == "BackSpace":
-    #         data.textbox.backspace()
-    #     elif (event.char.isalpha() 
-    #          or event.char.isdigit() 
-    #          or event.char.isspace()
-    #          or event.char in valid):
-    #         data.textbox.add_text(event.char)
-
-    # elif event.keysym == "Return":
-    #     init_compile_data(data)
-    #     code_lines = filter_space(data.code.splitlines(), data.debug_mode)
-    #     data.code = "\n".join(code_lines)
-    #     variables = dict()
-    #     variables['x'] = 0
-    #     variables['y'] = 0
-    #     variables['color'] = None
-    #     interpret(data, data.code, variables)
-    #     print("frame post return: ", data.frames)
-
-    # display axes
-    # elif event.char == "a":
-    #     data.axes = not(data.axes)
-
-    # elif event.char == "d":
-    #     data.debug_mode = not(data.debug_mode)
-
-    # elif event.char.isdigit():
-    #     ver = int(event.char)
-    #     if ver == 0:
-    #         data.ver = None
-    #     else:
-    #         data.ver = int(event.char)
-    # save code written
-    # elif event.char == "s":
-    #     data.textbox.save(data.ver)
-    #     print("data saved")
-
-    # # load previous code written
-    # elif event.char == "l":
-    #     data.textbox.load(data.ver)
-    #     print("data loaded")
-
-    # # help
-    # elif event.char == "h":
-    #     data.help = True
-
-    # continue after break point
-    # elif event.char == "c":
-    #     while len(data.frames) > 0:
-    #         frame = data.frames.pop()
-    #         print("popped frame:", frame)
-    #         # transfer results from recursive call for next iteration
-    #         # variables = frame[-1]
-    #         # frame = frame[:-1]
-    #         result = interpret(data, data.code, *frame)
-    #         if result == None: # an error occured
-    #             data.frames = []
-    #             return 
-    #         (_, break_called, x0, y0, x1, y1, color, variables) = result
-    #         if break_called:
-    #             print("frame post c: ", data.frames)
-    #             return
-
-
 def timerFired(data):
     data.counter += 1
 
@@ -975,7 +779,7 @@ def redrawAll(canvas, data):
         data.console.create_text(data.draw_window_margin + data.margin,
                            data.draw_window_margin + data.draw_window_height,
                            text="Debug Mode",
-                           anchor=SW)
+                           anchor=SW, fill="white")
     if data.axes:
         draw_axes(canvas, data)
     
@@ -983,13 +787,13 @@ def redrawAll(canvas, data):
         err_msg = "Error on line %d: %s" % (data.err_line, data.err_msg)
         data.console.create_text(data.draw_window_margin + data.margin, 
                            data.draw_window_margin + data.margin, 
-                           text=err_msg, anchor=NW)
+                           text=err_msg, anchor=NW, fill="white")
     else:
         draw_code(canvas, data)
         p = "\n".join(data.print_string)
         data.console.create_text(data.draw_window_margin + data.margin,
                            data.draw_window_margin + data.margin,
-                           text=p, anchor=NW)
+                           text=p, anchor=NW, fill="white")
 
 #http://stackoverflow.com/questions/16369470/tkinter-adding-line-number-to-text-widget
 class TextLineNumbers(tkinter.Canvas):
@@ -1067,13 +871,15 @@ class CustomTextBox(tkinter.Frame):
         self.text.bind("<Configure>", self._on_change) 
         self.text.bind("<Tab>", self.insert_tab) # BUG WITH TAB IF NO INIT
         
-        self.debugcolor ="#c52672"
-        self.keycolor = "#66d9ef"
+        self.debugcolor = "#66d9ef"
+        self.keycolor = "#c52672"
         self.text.tag_configure("keyword", foreground=self.keycolor)
         self.text.tag_configure("debug", foreground=self.debugcolor)
 
-        self.keywords = ["if", "while", "repeat", "def"]
+        self.keywords = ["if", "while", "repeat", "def", "else"]
         self.debug = ["break", "print"]
+
+        self.filename=""
 
     def insert_tab(self, event):
         # insert 4 spaces
@@ -1087,29 +893,27 @@ class CustomTextBox(tkinter.Frame):
         text = self.text.get("1.0",'end-1c')
         return text
 
-    def save(self, ver=None):
-        # print("save")
-        # filename =  filedialog.asksaveasfilename(initialdir = "/",title = "Select file")
-        # writeFile(filename, contents)
-
+    def saveas(self):
+        print("saveas")
+        self.filename =  filedialog.asksaveasfilename(initialdir = "/",title = "Select file")
         contents = self.get_text()
-        if ver == None:
-            writeFile("code.txt", contents)
+        writeFile(self.filename, contents)
+
+    def save(self, ver=None):
+        print("save")
+        if(self.filename==""):
+            self.saveas()
         else:
-            filename = "code%d.txt" % ver
-            writeFile(filename, contents)
+            contents = self.get_text()
+            writeFile(self.filename, contents)
 
     def load(self, ver=None):
-        # print("load")
-        # filename =  filedialog.askopenfilename(initialdir = "/",title = "Select file")
-        # contents = readFile(filename)
-        # self.text = list(contents)
-        # self.index = len(self.text)
-        if ver == None:
-            contents = readFile("code.txt")
-        else:
-            filename = "code%d.txt" % ver
-            contents = readFile(filename)
+        print("load")
+        self.delete()
+        self.filename =  filedialog.askopenfilename(initialdir = "/",title = "Select file")
+        print("file", self.filename)
+        if(self.filename != ""):
+            contents = readFile(self.filename)
         self.enable()
         self.text.insert("end",contents)
         self.color()
@@ -1170,8 +974,12 @@ def createmenu(root, data):
     # create a File menu and add it to the menubar
     file_menu = tkinter.Menu(menubar, tearoff=False)
     menubar.add_cascade(label="File", menu=file_menu)
-    file_menu.add_command(label="Save", command=lambda: savecode(data))
-    file_menu.add_command(label="Load", command=lambda: loadcode(data))
+    file_menu.add_command(label="Save", underline=1, command=lambda: savecode(data), 
+        accelerator="Ctrl+S")
+    file_menu.add_command(label="Save As", underline=1, command=lambda: saveascode(data), 
+        accelerator="Ctrl+E")
+    file_menu.add_command(label="Load", underline=1, command=lambda: loadcode(data),
+         accelerator="Ctrl+L")
 
     edit_menu = tkinter.Menu(menubar, tearoff=False)
     menubar.add_cascade(label="Edit", menu=edit_menu)
@@ -1179,22 +987,22 @@ def createmenu(root, data):
 
     tools_menu = tkinter.Menu(menubar, tearoff=False)
     menubar.add_cascade(label="Tools", menu=tools_menu)
-    tools_menu.add_cascade(label="Run", command=lambda: runcode(data))
-    tools_menu.add_cascade(label="Toggle Axes", command=lambda: toggleaxes(data))
-    tools_menu.add_cascade(label="Toggle Debug", command=lambda: toggledebug(data))
-    tools_menu.add_cascade(label="Step", command=lambda: debugstep(data))
+    tools_menu.add_command(label="Run", underline=1,
+                             command=lambda: runcode(data), accelerator="Ctrl+R")
+    tools_menu.add_command(label="Toggle Axes",  underline=1,
+        command=lambda: toggleaxes(data),  accelerator="Ctrl+A")
+    tools_menu.add_command(label="Toggle Debug", underline=1, 
+        command=lambda: toggledebug(data), accelerator="Ctrl+D")
+    tools_menu.add_command(label="Step", underline=1, 
+        command=lambda: debugstep(data), accelerator="Ctrl+I")
 
-    # # create a Edit menu and add it to the menubar
-    # edit_menu = tkinter.Menu(self.menubar, tearoff=False)
-    # menubar.add_cascade(label="Edit", menu=edit_menu)
-    # edit_menu.add_command(label="Cut", underline=2, command=on_cut)
-    # edit_menu.add_command(label="Copy", underline=0, command=on_copy)
-    # edit_menu.add_command(label="Paste", underline=0, command=on_paste)
-
-    # # create a View menu and add it to the menubar
-    # view_menu = tkinter.Menu(menubar, tearoff=False)
-    # menubar.add_cascade(label="View", menu=view_menu)
-    # view_menu.add_cascade(label="Whatever", command=on_whatever)
+    root.bind_all("<Control-r>", lambda e: runcode(data))
+    root.bind_all("<Control-a>", lambda e: toggleaxes(data))
+    root.bind_all("<Control-d>", lambda e: toggledebug(data))
+    root.bind_all("<Control-i>", lambda e: debugstep(data))
+    root.bind_all("<Control-s>", lambda e: savecode(data))
+    root.bind_all("<Control-e>", lambda e: saveascode(data))
+    root.bind_all("<Control-l>", lambda e: loadcode(data))
 
 def run(width=1500, height=600):
     def redrawAllWrapper(canvas, data):
@@ -1236,33 +1044,9 @@ def run(width=1500, height=600):
     # create menu
     createmenu(root, data)
 
-
     #master frame = left half of the screen
     data.masterframe = Frame(root, width = width, height= height)
     data.masterframe.pack(side="left", fill="both", expand = True)
-
-    # runButton = Button(data.masterframe, text="Run", command= lambda: runcode(data))
-    # runButton.config(highlightbackground = data.bg)
-
-    # runButton.pack(side="left", padx = 15, pady = 10)
-
-    # saveButton = Button(data.masterframe, text="Save", command= lambda: savecode(data), bg=data.bg)
-    # saveButton.pack(side="left", padx = 15, pady = 10)
-
-    # loadButton = Button(data.masterframe, text="Load", command= lambda: loadcode(data), bg=data.bg)
-    # loadButton.pack(side="left", padx = 15, pady = 10)
-
-    # clearButton = Button(data.masterframe, text="Clear", command= lambda: clearcode(data), bg=data.bg)
-    # clearButton.pack(side="left", padx = 15, pady = 10)
-
-    # axesButton = Button(data.masterframe, text="Toggle Axes", command= lambda: toggleaxes(data), bg=data.bg)
-    # axesButton.pack(side="left", padx = 15, pady = 10)
-
-    # debugButton = Button(data.masterframe, text="Toggle Debug", command= lambda: toggledebug(data), bg=data.bg)
-    # debugButton.pack(side="left", padx = 15, pady = 10)
-
-    # stepButton = Button(data.masterframe, text="Step", command= lambda: stepdebug(data), bg=data.bg)
-    # stepButton.pack(side="left", padx = 15, pady = 10)
 
     data.textbox = CustomTextBox(data.masterframe, width = data.textbox_width, 
         height = height)
