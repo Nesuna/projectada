@@ -151,6 +151,7 @@ def writeFile(filename, contents, mode="wt"):
 # with the variables actual value
 # variables:dict<str, _> - maps variable names to vals
 # expr:str - expression containing some or no var names
+
 def replace_vars_with_values(data, variables, expr):
     
     elist = list(expr)
@@ -162,13 +163,15 @@ def replace_vars_with_values(data, variables, expr):
             offset += 1
     expr = "".join(elist)
     sorted_by_len = sorted(variables, key=lambda s: -len(s)) # longest first
-
+    print("sorted vars", sorted_by_len)
     for var in sorted_by_len:
         if var in expr:
             num_occurences = expr.count(var)
             temp = expr.replace(var, "%r")
             expr = temp % ((variables[var],)*num_occurences)
     return expr
+
+# line: 5, lineLength: 10 x+y
 
 def test_replace_vars_with_vals(): 
     print("Testing replace_vars_with_vals...")
@@ -194,8 +197,10 @@ def test_replace_vars_with_vals():
 #   is set
 def eval_expr(data, variables, expr, line_num):
     assert(type(variables)==dict)
+    
     if (expr == "") : return ""
     expr = replace_vars_with_values(data, variables, expr)
+    if not containsDigit(expr): return expr
     print("165", expr)
     try:
         safe_syms = "<>/*+-.()%="
@@ -255,6 +260,14 @@ def test_strip_end():
                      "how perfect there's nothing to strip")
     print("...passed!")
 
+def filter_comments(code_lines):
+    result = []
+    for i in range(len(code_lines)):
+        line = code_lines[i]
+        if not line.startswith("#"):
+            result.append(line)
+    return result
+
 # returns list of split lines and new line number
 # extracts indented body of code as in body of for loop/if statement etc.
 # returns list of lines of code as well as the new line number
@@ -269,7 +282,8 @@ def get_indent_body(data, code_lines, k):
         else:
             print(code_lines[k])
             raise Exception("you missed something")
-        body += [code_lines[k], "\n"] # there used to be strip_end call here
+        if not code_lines[k][0] == "#":
+            body += [code_lines[k], "\n"] # there used to be strip_end call here
         k += 1
     return (body, k)
 
@@ -289,9 +303,10 @@ def test_get_indent_body():
     assert(get_indent_body(data ,code_lines, 5) == (["y<-y+10", "\n", "draw", "\n"], 7))
     print("...passed!")
 
-
 # gets rid of empty lines, lines with comments
 # inserts break points if debug mode is on
+# code_lines is a list
+# returns a list
 def filter_space(code_lines, debug=False):
 
     filtered_code = []
@@ -337,28 +352,63 @@ def test_filter_space():
         '    x<-x+10', '\tbreak', '\ty<-y+10', '\tbreak', '\tdraw', '\tbreak', 
         '\ty<-y+10', '\tbreak', '\tdraw', '\tbreak'])
 
+# checks if there's a fn name in the expr
 def containsFunction(functions, expr):
     for fn_name in functions:
         if fn_name in expr:
             return True
     return False
 
+# finds index of closing paren given index of opening paren
+def getMatchingClosingParen(expr, i=0):
+    count = 0
+    for j in range(i, len(expr)):
+        if expr[j] == "(":
+            count += 1
+        if expr[j] == ")":
+            count -= 1
+        if count == 0:
+            return j 
+    return i 
+
+# gets contents between parentheses
+def getParenContents(expr, i=0):
+    lparen_i = expr.find("(", i)
+    rparen_i = getMatchingClosingParen(expr, lparen_i)
+    return expr[lparen_i+1:rparen_i]
+
+def testGetParenContents():
+    print("Testing getParenContents...")
+    assert(getParenContents("hi(these are the contents)") == "these are the contents")
+    assert(getParenContents("(((yo)))") == "((yo))")
+    assert(getParenContents("(((yo)), (hi))", 9) == "hi")
+    print("...passed!")
+
 def replace_functions_with_values(data, functions, variables, line, color, x0, y0, x1, y1, depth=0):
 
     sorted_by_len = sorted(functions, key=lambda s: -len(s)) # longest first
     for fn_name in sorted_by_len:
         i = line.find(fn_name)
-        while (i != -1):
+        while (i != -1): # replace all instances of the function name in the expr
+            # current logic assumes no parentheses are used in args
             lparen_i = line.find("(", i)
-            rparen_i = line.find(")", i)
+            rparen_i = getMatchingClosingParen(line, lparen_i)
             name = line[:lparen_i].strip()
-            vals = line[lparen_i+1:rparen_i]
+            vals = getParenContents(line, lparen_i)
             if vals == "":
                 vals = []
             else:
                 vals = [elem.strip() for elem in vals.split(",")] 
+                tempvals = []
+                for expr in vals:
+                    if (containsFunction(data.fns, expr)):
+                        tempvals.append(replace_functions_with_values(data, functions, variables, expr, color, x0, y0, x1, y1))
+                    else:
+                        tempvals.append(expr)
+
+                
                 # vals = [replace_functions_with_values(data, functions, variables, expr, color, x0, y0, x1, y1) if containsFunction(functions, expr) else expr for expr in vals]
-                vals = [eval_expr(data, variables, expr, i) for expr in vals]
+                vals = [eval_expr(data, variables, expr, i) for expr in tempvals]
             (_, args, body) = functions[fn_name]
             f_variables = dict()
             f_variables["x"] = variables["x"]
@@ -380,7 +430,12 @@ def replace_functions_with_values(data, functions, variables, line, color, x0, y
             i = line.find(fn_name)
     return line
 
-
+# checks if there are any numbers in the expr
+def containsDigit(s):
+    for c in s:
+        if c.isdigit():
+            return True
+    return False
 
 """
 code: a multi-line string of "code"
@@ -402,46 +457,46 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
         print("i: ", i)
         line = code_lines[i]
         print("processing line:", line)
-        if line.startswith("x"):
-            # if you can't split, then there's a syntax error
-            try:
-                expr = line.split("<-")[1].strip()
-            except:
-                data.error = True
-                data.err_msg = "assignment should be of the form \'x <- 5\'"
-                data.err_line = i
+        # if line.startswith("x"):
+        #     # if you can't split, then there's a syntax error
+        #     try:
+        #         expr = line.split("<-")[1].strip()
+        #     except:
+        #         data.error = True
+        #         data.err_msg = "assignment should be of the form \'x <- 5\'"
+        #         data.err_line = i
 
-            expr = replace_functions_with_values(data, data.fns, variables, 
-                expr, color, x0, y0, x1, y1)
-            if (expr) == None:
-                return None
-            expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
-            val = eval_expr(data, variables, expr, i)
-            if val == None:
-                return None
-            variables['x'] = val
-            x1 = val
+        #     expr = replace_functions_with_values(data, data.fns, variables, 
+        #         expr, color, x0, y0, x1, y1)
+        #     if (expr) == None:
+        #         return None
+        #     expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
+        #     val = eval_expr(data, variables, expr, i)
+        #     if val == None:
+        #         return None
+        #     variables['x'] = val
+        #     x1 = val
 
-        elif line.startswith("y"):
-            # if you can't split, then there's a syntax error
-            expr = line.split("<-")[1].strip()
-            expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
-            val = eval_expr(data, variables, expr, i)
-            if val == None: # there was an error
-                return None 
-            variables['y'] = val
-            y1 = val
+        # elif line.startswith("y"):
+        #     # if you can't split, then there's a syntax error
+        #     expr = line.split("<-")[1].strip()
+        #     expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
+        #     val = eval_expr(data, variables, expr, i)
+        #     if val == None: # there was an error
+        #         return None 
+        #     variables['y'] = val
+        #     y1 = val
 
-        elif line.startswith("color"):
-            # if you can't split, then there's a syntax error
-            if (len(line.split("<-")) < 2):
-                data.error = True
-                data.err_msg = "should be of the form \'color <- black\'"
-                data.err_line = i
-            color = line.split("<-")[1].strip() 
-            variables["color"] = color
+        # elif line.startswith("color"):
+        #     # if you can't split, then there's a syntax error
+        #     if (len(line.split("<-")) < 2):
+        #         data.error = True
+        #         data.err_msg = "should be of the form \'color <- black\'"
+        #         data.err_line = i
+        #     color = line.split("<-")[1].strip() 
+        #     variables["color"] = color
         
-        elif "<-" in line:
+        if "<-" in line:
             if (len(line.split("<-")) < 2):
                 data.error = True
                 data.err_msg = "should be of the form \'variable_name <- value\'"
@@ -455,6 +510,12 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             if res == None:
                 return 
             variables[var] = res
+            if var == "x":
+                x1 = val
+            elif var == "y":
+                y1 = val
+            elif var == "color":
+                color = val
 
         elif line.startswith("draw") and line[len("draw"):] == "":
             print("adding draw job!!")
@@ -615,6 +676,8 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             print("before get_indent_body")
             print(code_lines)
             body, k = get_indent_body(data, code_lines, i + 1)
+            print("after get_indent_body")
+            print(body)
             # print("repeat loop body:\n", "".join(body))
             # print(k)
             # never entered the while loop
@@ -670,6 +733,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             print(s)
             s = replace_functions_with_values(data, data.fns, variables, s, color, x0, y0, x1, y1)
             s = replace_vars_with_values(data, variables, s)
+            s = str(eval_expr(data, variables, s, i))
             data.print_string.append(s)
 
         elif line.startswith("break"):
