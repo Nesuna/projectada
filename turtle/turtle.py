@@ -414,7 +414,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             if (cond):
 
                 if data.frames != []:
-                    result = interpret(data, "".join(body), *data.frames.pop(), depth+4)    
+                    result = interpret(data, "".join(body), *data.frames.pop(), depth=depth+4)    
                 else: 
                     result = interpret(data, "".join(body), variables, 0, color,
                                        0, x0, y0, x1, y1, depth+4)
@@ -436,7 +436,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     return (False, False, True, x0, y0, x1, y1, color, variables)
             elif (else_exists):
                 if data.frames != []:
-                    result = interpret(data, "".join(else_body), *data.frames.pop(), depth+4)    
+                    result = interpret(data, "".join(else_body), *data.frames.pop(), depth=depth+4)    
                 else: 
                     result = interpret(data, "".join(else_body), variables, 0, color,
                                        0, x0, y0, x1, y1, depth+4)
@@ -541,7 +541,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     # print(data.frames)
                     frame = data.frames.pop()
                     # print("550 frame: ", frame)
-                    result = interpret(data, "".join(body), *(frame), depth+4)    
+                    result = interpret(data, "".join(body), *(frame), depth=depth+4)   
                 else: 
                     result = interpret(data, "".join(body), variables, 0, color, 0, x0, y0, x1, y1, depth+1)
                 
@@ -993,9 +993,10 @@ class CustomTextBox(tkinter.Frame):
         if(self.filename != ""):
             self.delete()
             contents = readFile(self.filename)
+            self.text.insert("end",contents)
+            self.color()
         self.enable()
-        self.text.insert("end",contents)
-        self.color()
+
     
     def delete(self):
         self.text.delete('1.0', END)
