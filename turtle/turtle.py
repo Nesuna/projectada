@@ -873,8 +873,10 @@ class CustomTextBox(tkinter.Frame):
         
         self.debugcolor = "#66d9ef"
         self.keycolor = "#c52672"
+        self.stringcolor = "#e6db6e"
         self.text.tag_configure("keyword", foreground=self.keycolor)
         self.text.tag_configure("debug", foreground=self.debugcolor)
+        self.text.tag_configure("string", foreground=self.stringcolor)
 
         self.keywords = ["if", "while", "repeat", "def", "else"]
         self.debug = ["break", "print"]
@@ -938,6 +940,8 @@ class CustomTextBox(tkinter.Frame):
         #coordinate is row.col
         for line in text.splitlines():
             c = 0
+
+            #highlight each word if it is a debug or keyword
             while(c < len(line)):
                 char = line[c]
                 if(char not in string.whitespace):
@@ -960,6 +964,23 @@ class CustomTextBox(tkinter.Frame):
                     elif word in self.debug:
                         self.text.tag_add("debug", initc, endc)
                 c+= 1
+
+            #highlight strings
+            i = 0
+            strstart = None
+            while(i < len(line)):
+                if(line[i] == "\"" and strstart == None):
+                    strstart = i
+                elif(line[i] == "\"" and strstart != None):
+                    initc = "%d.%d" % (r, strstart)
+                    endc = "%d.%d" % (r, i + 1)
+                    self.text.tag_add("string", initc, endc)
+                    strstart = None
+                i+=1
+
+            #highlight numbers
+            #highlight line in debug mode
+            #highlight line if error
             r+=1
 
 
@@ -1040,6 +1061,8 @@ def run(width=1500, height=600):
     # create the root and the canvas
     root = Tk()
     root.configure(bg=data.bg)
+    xscrollbar = tkinter.Scrollbar(root, orient="horizontal")
+    xscrollbar.pack(side=BOTTOM, fill=X)
 
     # create menu
     createmenu(root, data)
