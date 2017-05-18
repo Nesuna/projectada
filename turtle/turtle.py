@@ -107,7 +107,7 @@ def eval_expr(data, variables, expr, line_num):
     if (expr == "") : return ""
     expr = replace_vars_with_values(data, variables, expr)
     if not containsDigit(expr): return expr
-    print("165", expr)
+    # print("165", expr)
     try:
         safe_syms = "<>/*+-.()%="
         for c in expr:
@@ -386,9 +386,9 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             try: 
                 # get contents between parens <- you can make that a helper function
                 start = line.find("(")
-                revline = line[::-1]
-                end = len(line) - revline.find(")") - 1
-                expr = line[start + 1:end]
+                # revline = line[::-1]
+                # end = len(line) - revline.find(")") - 1
+                expr = getParenContents(line, start)
                 expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
                 cond = eval_expr(data, variables, expr, i)
 
@@ -463,8 +463,9 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             try: 
                 # get contents between parens
                 start = line.find("(")
-                end = getParenContents(line, start)
-                expr = line[start + 1:end]
+                expr = getParenContents(line, start)
+                # expr = line[start + 1:end]
+                print("468 expr", expr)
                 expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
                 cond = eval_expr(data, variables, expr, i)
 
@@ -558,7 +559,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     # terminated keeps track of whether you've completed the inner loop or not
                     if (terminated): repeated += 1
                     frame = (variables, i, color, repeated, x0, y0, x1, y1)
-                    print("appending frame: ", frame)
+                    # print("appending frame: ", frame)
                     data.frames.append(frame)
                     return (False, False, True, x0, y0, x1, y1, color, variables)
                 
