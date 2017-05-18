@@ -16,10 +16,10 @@ Current features:
   - debug mode (using breaks)
   - general variables
   - while loops
+  - functions -> when you return you need to skip the rest of the fn  
   - TODO:
    - adjust pen width
    - super clear error handling
-   - functions -> when you return you need to skip the rest of the fn  
    - range -> actually implement it
    - confirm that debug-mode works correctly with fns** (it doesn't. lmao)
    - convert everything to data
@@ -58,6 +58,7 @@ def writeFile(filename, contents, mode="wt"):
 # with the variables actual value
 # variables:dict<str, _> - maps variable names to vals
 # expr:str - expression containing some or no var names
+
 def replace_vars_with_values(data, variables, expr):
     
     elist = list(expr)
@@ -69,13 +70,15 @@ def replace_vars_with_values(data, variables, expr):
             offset += 1
     expr = "".join(elist)
     sorted_by_len = sorted(variables, key=lambda s: -len(s)) # longest first
-
+    print("sorted vars", sorted_by_len)
     for var in sorted_by_len:
         if var in expr:
             num_occurences = expr.count(var)
             temp = expr.replace(var, "%r")
             expr = temp % ((variables[var],)*num_occurences)
     return expr
+
+# line: 5, lineLength: 10 x+y
 
 def test_replace_vars_with_vals(): 
     print("Testing replace_vars_with_vals...")
@@ -101,8 +104,10 @@ def test_replace_vars_with_vals():
 #   is set
 def eval_expr(data, variables, expr, line_num):
     assert(type(variables)==dict)
+    
     if (expr == "") : return ""
     expr = replace_vars_with_values(data, variables, expr)
+    if not containsDigit(expr): return expr
     print("165", expr)
     try:
         safe_syms = "<>/*+-.()%="
@@ -162,6 +167,14 @@ def test_strip_end():
                      "how perfect there's nothing to strip")
     print("...passed!")
 
+def filter_comments(code_lines):
+    result = []
+    for i in range(len(code_lines)):
+        line = code_lines[i]
+        if not line.startswith("#"):
+            result.append(line)
+    return result
+
 # returns list of split lines and new line number
 # extracts indented body of code as in body of for loop/if statement etc.
 # returns list of lines of code as well as the new line number
@@ -176,7 +189,8 @@ def get_indent_body(data, code_lines, k):
         else:
             print(code_lines[k])
             raise Exception("you missed something")
-        body += [code_lines[k], "\n"] # there used to be strip_end call here
+        if not code_lines[k][0] == "#":
+            body += [code_lines[k], "\n"] # there used to be strip_end call here
         k += 1
     return (body, k)
 
@@ -196,9 +210,10 @@ def test_get_indent_body():
     assert(get_indent_body(data ,code_lines, 5) == (["y<-y+10", "\n", "draw", "\n"], 7))
     print("...passed!")
 
-
 # gets rid of empty lines, lines with comments
 # inserts break points if debug mode is on
+# code_lines is a list
+# returns a list
 def filter_space(code_lines, debug=False):
 
     filtered_code = []
@@ -244,21 +259,63 @@ def test_filter_space():
         '    x<-x+10', '\tbreak', '\ty<-y+10', '\tbreak', '\tdraw', '\tbreak', 
         '\ty<-y+10', '\tbreak', '\tdraw', '\tbreak'])
 
+# checks if there's a fn name in the expr
+def containsFunction(functions, expr):
+    for fn_name in functions:
+        if fn_name in expr:
+            return True
+    return False
+
+# finds index of closing paren given index of opening paren
+def getMatchingClosingParen(expr, i=0):
+    count = 0
+    for j in range(i, len(expr)):
+        if expr[j] == "(":
+            count += 1
+        if expr[j] == ")":
+            count -= 1
+        if count == 0:
+            return j 
+    return i 
+
+# gets contents between parentheses
+def getParenContents(expr, i=0):
+    lparen_i = expr.find("(", i)
+    rparen_i = getMatchingClosingParen(expr, lparen_i)
+    return expr[lparen_i+1:rparen_i]
+
+def testGetParenContents():
+    print("Testing getParenContents...")
+    assert(getParenContents("hi(these are the contents)") == "these are the contents")
+    assert(getParenContents("(((yo)))") == "((yo))")
+    assert(getParenContents("(((yo)), (hi))", 9) == "hi")
+    print("...passed!")
+
 def replace_functions_with_values(data, functions, variables, line, color, x0, y0, x1, y1, depth=0):
 
     sorted_by_len = sorted(functions, key=lambda s: -len(s)) # longest first
     for fn_name in sorted_by_len:
         i = line.find(fn_name)
-        if (i != -1):
+        while (i != -1): # replace all instances of the function name in the expr
+            # current logic assumes no parentheses are used in args
             lparen_i = line.find("(", i)
-            rparen_i = line.find(")", i)
+            rparen_i = getMatchingClosingParen(line, lparen_i)
             name = line[:lparen_i].strip()
-            vals = line[lparen_i+1:rparen_i]
+            vals = getParenContents(line, lparen_i)
             if vals == "":
                 vals = []
             else:
                 vals = [elem.strip() for elem in vals.split(",")] 
-                vals = [eval_expr(data, variables, expr, i) for expr in vals]
+                tempvals = []
+                for expr in vals:
+                    if (containsFunction(data.fns, expr)):
+                        tempvals.append(replace_functions_with_values(data, functions, variables, expr, color, x0, y0, x1, y1))
+                    else:
+                        tempvals.append(expr)
+
+                
+                # vals = [replace_functions_with_values(data, functions, variables, expr, color, x0, y0, x1, y1) if containsFunction(functions, expr) else expr for expr in vals]
+                vals = [eval_expr(data, variables, expr, i) for expr in tempvals]
             (_, args, body) = functions[fn_name]
             f_variables = dict()
             f_variables["x"] = variables["x"]
@@ -277,12 +334,15 @@ def replace_functions_with_values(data, functions, variables, line, color, x0, y
             variables["color"] = f_variables["color"]
             line = (line[:i] + "%r" + line[rparen_i+1:]) % f_variables["return"]
             print("variables", variables)
-
+            i = line.find(fn_name)
     return line
 
-def test_replace_functions_with_values():
-    # data, functions, variables, line, color, x0, y0, x1, y1
-    pass
+# checks if there are any numbers in the expr
+def containsDigit(s):
+    for c in s:
+        if c.isdigit():
+            return True
+    return False
 
 """
 code: a multi-line string of "code"
@@ -304,46 +364,46 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
         print("i: ", i)
         line = code_lines[i]
         print("processing line:", line)
-        if line.startswith("x"):
-            # if you can't split, then there's a syntax error
-            try:
-                expr = line.split("<-")[1].strip()
-            except:
-                data.error = True
-                data.err_msg = "assignment should be of the form \'x <- 5\'"
-                data.err_line = i
+        # if line.startswith("x"):
+        #     # if you can't split, then there's a syntax error
+        #     try:
+        #         expr = line.split("<-")[1].strip()
+        #     except:
+        #         data.error = True
+        #         data.err_msg = "assignment should be of the form \'x <- 5\'"
+        #         data.err_line = i
 
-            expr = replace_functions_with_values(data, data.fns, variables, 
-                expr, color, x0, y0, x1, y1)
-            if (expr) == None:
-                return None
-            expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
-            val = eval_expr(data, variables, expr, i)
-            if val == None:
-                return None
-            variables['x'] = val
-            x1 = val
+        #     expr = replace_functions_with_values(data, data.fns, variables, 
+        #         expr, color, x0, y0, x1, y1)
+        #     if (expr) == None:
+        #         return None
+        #     expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
+        #     val = eval_expr(data, variables, expr, i)
+        #     if val == None:
+        #         return None
+        #     variables['x'] = val
+        #     x1 = val
 
-        elif line.startswith("y"):
-            # if you can't split, then there's a syntax error
-            expr = line.split("<-")[1].strip()
-            expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
-            val = eval_expr(data, variables, expr, i)
-            if val == None: # there was an error
-                return None 
-            variables['y'] = val
-            y1 = val
+        # elif line.startswith("y"):
+        #     # if you can't split, then there's a syntax error
+        #     expr = line.split("<-")[1].strip()
+        #     expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
+        #     val = eval_expr(data, variables, expr, i)
+        #     if val == None: # there was an error
+        #         return None 
+        #     variables['y'] = val
+        #     y1 = val
 
-        elif line.startswith("color"):
-            # if you can't split, then there's a syntax error
-            if (len(line.split("<-")) < 2):
-                data.error = True
-                data.err_msg = "should be of the form \'color <- black\'"
-                data.err_line = i
-            color = line.split("<-")[1].strip() 
-            variables["color"] = color
+        # elif line.startswith("color"):
+        #     # if you can't split, then there's a syntax error
+        #     if (len(line.split("<-")) < 2):
+        #         data.error = True
+        #         data.err_msg = "should be of the form \'color <- black\'"
+        #         data.err_line = i
+        #     color = line.split("<-")[1].strip() 
+        #     variables["color"] = color
         
-        elif "<-" in line:
+        if "<-" in line:
             if (len(line.split("<-")) < 2):
                 data.error = True
                 data.err_msg = "should be of the form \'variable_name <- value\'"
@@ -357,8 +417,14 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             if res == None:
                 return 
             variables[var] = res
+            if var == "x":
+                x1 = val
+            elif var == "y":
+                y1 = val
+            elif var == "color":
+                color = val
 
-        elif line.startswith("draw"):
+        elif line.startswith("draw") and line[len("draw"):] == "":
             print("adding draw job!!")
             if color != "none":
                 print("x0, y0, x1, y1", (x0, y0, x1, y1))
@@ -517,6 +583,8 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             print("before get_indent_body")
             print(code_lines)
             body, k = get_indent_body(data, code_lines, i + 1)
+            print("after get_indent_body")
+            print(body)
             # print("repeat loop body:\n", "".join(body))
             # print(k)
             # never entered the while loop
@@ -567,20 +635,19 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
         elif line.startswith("print"):
             s = line[len("print("):]
             revs = s[::-1]
-            print(revs)
             end = len(s) - revs.find(")") - 1 # finds right most paren ()
-            print("PRINT")
             s = s[:end]
             print(s)
             s = replace_functions_with_values(data, data.fns, variables, s, color, x0, y0, x1, y1)
             s = replace_vars_with_values(data, variables, s)
+            s = str(eval_expr(data, variables, s, i))
             data.print_string.append(s)
 
         elif line.startswith("break"):
             frame = (variables, i + 1, color, 0, x0, y0, x1, y1)
             
             if (i + 1) == n:
-                return (True, True, x0, y0, x1, y1, color, variables)
+                return (False, True, True, x0, y0, x1, y1, color, variables)
             print("595 appending frame: ", frame)
             data.frames.append(frame)
             return (False, False, True, x0, y0, x1, y1, color, variables)
@@ -598,6 +665,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                 i = k - 1 # set i to skip code for body
                 # int, tuple, str
                 data.fns[fn_name] = (len(args), args, "".join(body))
+                print(data.fns)
             except Exception as e:
                 print(e)
                 data.error = True
@@ -608,10 +676,8 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
 
         elif line.startswith("return"):
             expr = line[len("return"):].strip()
-            print("717", expr)
             expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
             variables["return"] = eval_expr(data, variables, expr, i)
-            print("line 720: ret val" , variables["return"])
             return (True, True, False, x0, y0, x1, y1, color, variables)
         # here is where you run the function        
         elif "(" in line: # what if it's return ("(")
@@ -636,7 +702,14 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
                     var_name = args[j]
                     f_variables[var_name] = vals[j]
                 # 0, color, 0, x0, y0, x1, y1
-                (_, _, _, x0, y0, x1, y1, color, _) = interpret(data, body, f_variables, 0, color, 0, x0, y0, x1, y1, depth=depth+4)
+                if data.frames != []:
+                    result = interpret(data, "".join(body), *data.frames.pop())    
+                else: 
+                    result = interpret(data, body, f_variables, 0, color, 0, x0, y0, x1, y1, depth=depth+4)
+                if result == None:
+                    return 
+                (_, terminated, break_called, x0, y0, x1, y1, color, _) = result
+                
                 print("f_variables", f_variables)
                 variables["x"] = f_variables["x"]
                 variables["y"] = f_variables["y"]
@@ -644,6 +717,14 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
                 print("x0: %d, y0: %d" % (x0, y0))
                 print("variables", variables)
                 print("returned")
+                if break_called:
+                    # terminated keeps track of whether you've completed the inner loop or not
+                    # print("terminated: ", terminated)
+                    if (not terminated):
+                        frame = (variables, i, color, 0, x0, y0, x1, y1)
+                        print("appending frame: ", frame)
+                        data.frames.append(frame)
+                        return (False, False, True, x0, y0, x1, y1, color, variables)
             else:
                 data.error = True
                 data.err_msg = "invalid function name"
@@ -665,7 +746,8 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
     
         i += 1
 
-    print(" "*depth +"line 495 variables: ", variables)
+    # print(" "*depth +"line 495 variables: ", variables)
+    # print("stuff to draw", data.to_draw)
     return (False, True, False, x0, y0, x1, y1, color, variables)
 
 def draw_code(canvas, data):
@@ -820,7 +902,7 @@ def stepdebug(data):
         if result == None: # an error occured
             data.frames = []
             return 
-        (_, break_called, x0, y0, x1, y1, color, variables) = result
+        (_, _, break_called, x0, y0, x1, y1, color, variables) = result
         if break_called:
             print("frame post c: ", data.frames)
             return
@@ -1002,7 +1084,7 @@ class CustomTextBox(tkinter.Frame):
         #TODO: fix select text
 
     def color(self):
-        print("the text", self.text.get("1.0", END))
+        # print("the text", self.text.get("1.0", END))
         text = self.text.get("1.0", END)
         r = 1
         #rows start at 1 and columns start at 0 *_*
@@ -1016,13 +1098,13 @@ class CustomTextBox(tkinter.Frame):
                 if(char not in string.whitespace):
                     initc = "%d.%d" %(r, c)
                     while(c<len(line)-1 and line[c+1] not in string.whitespace):
-                        print("finding word", char, c)
+                        # print("finding word", char, c)
                         c+=1
                         char = line[c]
-                    print("end c ", c)
+                    # print("end c ", c)
                     endc = "%d.%d" % (r, c+1)
                     word = self.text.get(initc, endc)
-                    print("word", word, initc,endc)
+                    # print("word", word, initc,endc)
                     #remove  old tags
                     for tag in self.text.tag_names():
                         self.text.tag_remove(tag, initc, endc)
@@ -1074,9 +1156,10 @@ def createmenu(root, data):
     edit_menu = tkinter.Menu(menubar, tearoff=False)
     menubar.add_cascade(label="Edit", menu=edit_menu)
     edit_menu.add_cascade(label="Clear", command=lambda: clearcode(data))
-
+    
     tools_menu = tkinter.Menu(menubar, tearoff=False)
     menubar.add_cascade(label="Tools", menu=tools_menu)
+
     tools_menu.add_command(label="Run", underline=1,
                              command=lambda: runcode(data), accelerator="Ctrl+R")
     tools_menu.add_command(label="Toggle Axes",  underline=1,
@@ -1170,6 +1253,23 @@ def run(width=1500, height=600):
     root.mainloop()  # blocks until window is closed
     print("bye!")
 
+def test_replace_functions_with_values():
+    # data, functions, variables, line, color, x0, y0, x1, y1
+    # make sure you replace multiple instances of the function 
+    print("Testing replace_functions_with_values...")
+    class Struct(): pass
+    data = Struct()
+    fns = {'fibb': (1, ['n'], 'if (n == 0):\n    return 1\nif (n == 1):\n    return 1\nreturn fibb(n - 1) + fibb(n - 2)\n')}
+    data.fns = fns
+    data.debug_mode = False
+    data.frames = []
+    variables = {'n': 3, 'y': 0, 'x': 0, 'color': None}
+    expr = "fibb(n - 1) + fibb(n - 2)"
+    fns['bar'] = (1, ['m'], 'return 0')
+    assert(replace_functions_with_values(data, fns, variables, expr, None, 0, 0, 0, 0) == "2 + 1")
+    # assert(replace_functions_with_values(data, fns, variables, "fibb(bar(42))", None, 0, 0, 0, 0) == "1")
+    print("...passed!")
+
 def test_all():
     print("Testing all functions...")
     test_replace_vars_with_vals()
@@ -1177,6 +1277,7 @@ def test_all():
     test_strip_end()
     test_get_indent_body()
     test_filter_space()
+    test_replace_functions_with_values()
     print("...passed!")
 
 test_all()
