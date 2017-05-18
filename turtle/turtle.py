@@ -107,7 +107,7 @@ def eval_expr(data, variables, expr, line_num):
     if (expr == "") : return ""
     expr = replace_vars_with_values(data, variables, expr)
     if not containsDigit(expr): return expr
-    # print("165", expr)
+    print("165", expr)
     try:
         safe_syms = "<>/*+-.()%="
         for c in expr:
@@ -353,8 +353,8 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
     n = len(code_lines)
     while (i < n):
         line = code_lines[i]
-        # print("i: ", i)
-        # print("processing line:", line)
+        print("i: ", i)
+        print("processing line:", line)
         
         if "<-" in line:
             if (len(line.split("<-")) < 2):
@@ -364,16 +364,19 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
 
             (var, expr) = (line.split("<-")[0].strip(), line.split("<-")[1].strip())
             expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
-            res = eval_expr(data, variables, expr, i)
-            if res == None:
-                return 
-            variables[var] = res
-            if var == "x":
-                x1 = res
-            elif var == "y":
-                y1 = res
-            elif var == "color":
-                color = res
+            if var == "color":
+                color = expr
+            else:
+                print("367 expr", expr)
+                res = eval_expr(data, variables, expr, i)
+                print("res", res)
+                if res == None:
+                    return 
+                variables[var] = res
+                if var == "x":
+                    x1 = res
+                elif var == "y":
+                    y1 = res
 
         elif line.startswith("draw") and line[len("draw"):] == "":
             if color != "none":
