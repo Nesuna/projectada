@@ -948,7 +948,6 @@ class CustomTextBox(tkinter.Frame):
         self.text.bind("<<Change>>", self._on_change)
         self.text.bind("<Configure>", self._on_change) 
         self.text.bind("<Tab>", self.insert_tab) # BUG WITH TAB IF NO INIT
-        
         self.debugcolor = "#66d9ef"
         self.keycolor = "#c52672"
         self.stringcolor = "#e6db6e"
@@ -956,7 +955,7 @@ class CustomTextBox(tkinter.Frame):
         self.text.tag_configure("debug", foreground=self.debugcolor)
         self.text.tag_configure("string", foreground=self.stringcolor)
 
-        self.keywords = ["if", "while", "repeat", "else"]
+        self.keywords = ["if", "while", "repeat", "else", "<-"]
         self.debug = ["break", "print", "def"]
 
         self.filename=""
@@ -1095,7 +1094,7 @@ def createmenu(root, data):
     tools_menu.add_command(label="Toggle Debug", underline=1, 
         command=lambda: toggledebug(data), accelerator="Ctrl+D")
     tools_menu.add_command(label="Step", underline=1, 
-        command=lambda: debugstep(data), accelerator="Ctrl+I")
+        command=lambda: stepdebug(data), accelerator="Ctrl+I")
 
     root.bind_all("<Control-r>", lambda e: runcode(data))
     root.bind_all("<Control-a>", lambda e: toggleaxes(data))
