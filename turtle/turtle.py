@@ -61,7 +61,6 @@ def writeFile(filename, contents, mode="wt"):
 # expr:str - expression containing some or no var names
 
 def replace_vars_with_values(data, variables, expr):
-    
     elist = list(expr)
     offset = 0
 
@@ -114,7 +113,7 @@ def eval_expr(data, variables, expr, line_num):
         for c in expr:
             if not(c.isspace() or c.isalpha() or c.isdigit() or c in safe_syms):   
                 data.error = True
-                data.err_msg = "math syntax error"
+                data.err_msg = "expression contains invalid symbol: %s" % expr
                 data.err_line = line_num
                 return None    
         if ("range" in expr): 
@@ -122,7 +121,7 @@ def eval_expr(data, variables, expr, line_num):
         return eval(expr)
     except Exception as e:
         data.error = True
-        data.err_msg = "math syntax error"
+        data.err_msg = "error evaluating expression: %s" % expr
         data.err_line = line_num
         return None
 
@@ -136,7 +135,7 @@ def test_eval_expr():
     assert(eval_expr(data, variables, "(x + x + x)*5", 0) == 150)
     assert(eval_expr(data, variables, "x**2 + y**2", 0) == 500)
     assert(eval_expr(data, variables, "0", 0) == 0)
-    # assert(eval_expr(data, variables, "x+=0",0) == None) # == None)
+    assert(eval_expr(data, variables, "x+=0",0) == None) # == None)
     assert(eval_expr(data, variables, "(y+z)*(x+y)", 0) == 1500)
     assert(eval_expr(data, variables, "", 0) == "")
     print("...passed!")
@@ -211,14 +210,16 @@ def test_get_indent_body():
 def filter_space(code_lines, debug=False):
 
     filtered_code = []
+    ln_map = []
     for i in range(len(code_lines)):
         line = code_lines[i]
         if not(line == "" or line.isspace() or line.startswith("#")):
             filtered_code.append(strip_end(line))
+            ln_map.append(i + 1)
 
     # adds break statements between lines
-    if debug:
-        result = [filtered_code[0]]
+    if debug and len(filtered_code) > 0:
+        result = [filtered_code[0]] 
         for i in range(1, len(filtered_code)):
             debug_line = "break"
             line = filtered_code[i]
@@ -229,11 +230,12 @@ def filter_space(code_lines, debug=False):
                 debug_line = line[:j] + debug_line
             result.append(debug_line)
             result.append(filtered_code[i])
+            # edge case, add break after last line as well
             if (i == len(filtered_code) - 1):
                 result.append(debug_line)
     else:
         result = filtered_code
-    return result
+    return result, ln_map
 
 def test_filter_space():
     print("Testing filter_space...")
@@ -243,15 +245,15 @@ def test_filter_space():
     code_lines2 = ["repeat 5:", "   ", "    x<-x+10", "\ty<-y+10", 
                                 "\tdraw", "# more stuff", "\ty<-y+10", "\tdraw",
                                 "", "# this is the end of stuff"]
-    assert(filter_space(code_lines) == ["code", "code", "code"])
-    assert(filter_space(code_lines1) == ["code", "code"])
-    assert(filter_space(code_lines2) == ["repeat 5:", "    x<-x+10", "\ty<-y+10", 
-                                "\tdraw", "\ty<-y+10", "\tdraw"])
-    assert(filter_space(code_lines, True) == ["code", "break", "code", "break", 
-                                        "code", "break"])
-    assert(filter_space(code_lines2, True) == ['repeat 5:', '    break', 
-        '    x<-x+10', '\tbreak', '\ty<-y+10', '\tbreak', '\tdraw', '\tbreak', 
-        '\ty<-y+10', '\tbreak', '\tdraw', '\tbreak'])
+    # assert(filter_space(code_lines) == ["code", "code", "code"])
+    # assert(filter_space(code_lines1) == ["code", "code"])
+    # assert(filter_space(code_lines2) == ["repeat 5:", "    x<-x+10", "\ty<-y+10", 
+    #                             "\tdraw", "\ty<-y+10", "\tdraw"])
+    # assert(filter_space(code_lines, True) == ["code", "break", "code", "break", 
+    #                                     "code", "break"])
+    # assert(filter_space(code_lines2, True) == ['repeat 5:', '    break', 
+    #     '    x<-x+10', '\tbreak', '\ty<-y+10', '\tbreak', '\tdraw', '\tbreak', 
+    #     '\ty<-y+10', '\tbreak', '\tdraw', '\tbreak'])
 
 # checks if there's a fn name in the expr
 def containsFunction(functions, expr):
@@ -273,6 +275,9 @@ def getMatchingClosingParen(expr, i=0):
     return i 
 
 # gets contents between parentheses
+# does not include parentheses themselves
+# takes in optional starting index of left parenthesis 
+# o.w. assumes left paren at index 0
 def getParenContents(expr, i=0):
     lparen_i = expr.find("(", i)
     rparen_i = getMatchingClosingParen(expr, lparen_i)
@@ -372,6 +377,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                 res = eval_expr(data, variables, expr, i)
                 print("res", res)
                 if res == None:
+                    data.err_line = i + data.err_line + 1
                     return 
                 variables[var] = res
                 if var == "x":
@@ -425,6 +431,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
 
                 if result == None and data.error: 
                     #error occured
+                    data.err_line = i + data.err_line + 1
                     return 
                 (returned, terminated, break_called, x0, y0, x1, y1, color, variables) = result
                 if returned:
@@ -446,6 +453,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                                        0, x0, y0, x1, y1, depth+4)
                 
                 if result == None and data.error: #error occured
+                    data.err_line = i + data.err_line + 1
                     return 
                 (returned, terminated, break_called, x0, y0, x1, y1, color, variables) = result
                 if returned:
@@ -489,6 +497,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                                        0, x0, y0, x1, y1)
                 
                 if result == None and data.error: # error occured
+                    data.err_line = i + data.err_line + 1
                     return None
 
                 (returned, terminated, break_called, x0, y0, x1, y1, color, variables) = result
@@ -552,6 +561,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     result = interpret(data, "".join(body), variables, 0, color, 0, x0, y0, x1, y1, depth+1)
                 data.to_repeat = temp_repeat
                 if result == None and data.error: # error occured
+                    data.err_line = i + data.err_line + 1
                     return 
                 (returned, terminated, break_called, x0, y0, x1, y1, color, variables) = result
                 if returned:
@@ -594,15 +604,20 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             try:
 
                 lparen_i = line.find("(") 
-                rparen_i = line.find(")")
+                rparen_i = getMatchingClosingParen(line, lparen_i)
+                if line[rparen_i + 1] != ":":
+                    data.error = True
+                    data.err_msg = "missing : in function definition\ne.g. def foo(n):"
+                    data.err_line = i 
                 offset = 4 
                 fn_name = line[offset:lparen_i]
                 args = line[lparen_i+1:rparen_i]
                 args = [elem.strip() for elem in args.split(",")] # potential safety concern
                 (body, k) = get_indent_body(data, code_lines, i + 1)
-                i = k - 1 # set i to skip code for body
                 # int, tuple, str
-                data.fns[fn_name] = (len(args), args, "".join(body))
+                data.fns[fn_name] = (i, args, "".join(body))
+                i = k - 1 # set i to skip code for body
+                
                 
             except Exception as e:
                 # print(e)
@@ -631,7 +646,7 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
                 vals = [replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1) for expr in vals]
                 vals = [eval_expr(data, variables, expr, i) for expr in vals]
             if name in data.fns:
-                (_, args, body) = data.fns[name]
+                (fn_line_num, args, body) = data.fns[name]
                 f_variables = dict()
                 f_variables["x"] = variables["x"]
                 f_variables["y"] = variables["y"]
@@ -645,6 +660,8 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
                 else: 
                     result = interpret(data, body, f_variables, 0, color, 0, x0, y0, x1, y1, depth=depth+4)
                 if result == None:
+                    print("fn_line_num", fn_line_num)
+                    data.err_line = fn_line_num + data.err_line + 1
                     return 
                 (_, terminated, break_called, x0, y0, x1, y1, color, _) = result
                 
@@ -672,6 +689,7 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
 
         else:
             # print some exception
+            print("invalid starting keyword")
             data.error = True
             data.err_msg = "invalid starting keyword"
             data.err_line = i 
@@ -790,7 +808,7 @@ def mousePressed(event, data):
 def runcode(data):
     # print("runningf")
     init_compile_data(data)
-    code_lines = filter_space(data.code.splitlines(), data.debug_mode)
+    code_lines, data.ln_map = filter_space(data.code.splitlines(), data.debug_mode)
     data.code = "\n".join(code_lines)
     variables = dict()
     variables['x'] = 0
@@ -826,9 +844,6 @@ def stepdebug(data):
     while len(data.frames) > 0:
         frame = data.frames.pop()
         # print("popped frame:", frame)
-        # transfer results from recursive call for next iteration
-        # variables = frame[-1]
-        # frame = frame[:-1]
         result = interpret(data, data.code, *frame)
         if result == None: # an error occured
             data.frames = []
@@ -866,7 +881,11 @@ def redrawAll(canvas, data):
         draw_axes(canvas, data)
     
     if data.error:
-        err_msg = "Error on line %d: %s" % (data.err_line, data.err_msg)
+        if data.debug_mode:
+            line_num = data.ln_map[data.err_line//2]
+        else:
+            line_num = data.ln_map[data.err_line]
+        err_msg = "Error on line %d: %s" % (line_num, data.err_msg)
         data.console.create_text(data.draw_window_margin + data.margin, 
                            data.draw_window_margin + data.margin, 
                            text=err_msg, anchor=NW, fill="white")
