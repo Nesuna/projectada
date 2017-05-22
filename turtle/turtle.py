@@ -35,6 +35,7 @@ from tkinter.scrolledtext import *
 import tkinter
 import string
 import math
+import random
 from tkinter import filedialog
 
 
@@ -540,7 +541,8 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
 
             # data.to_repeat - repeated to handle for breakpoints
             for j in range(data.to_repeat - repeated):
-    
+                temp_repeat = data.to_repeat
+                data.to_repeat = None
                 if data.frames != []:
                     # print(data.frames)
                     frame = data.frames.pop()
@@ -548,7 +550,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     result = interpret(data, "".join(body), *(frame), depth=depth+4)   
                 else: 
                     result = interpret(data, "".join(body), variables, 0, color, 0, x0, y0, x1, y1, depth+1)
-                
+                data.to_repeat = temp_repeat
                 if result == None and data.error: # error occured
                     return 
                 (returned, terminated, break_called, x0, y0, x1, y1, color, variables) = result
@@ -1102,7 +1104,7 @@ def createmenu(root, data):
     root.bind_all("<Control-r>", lambda e: runcode(data))
     root.bind_all("<Control-a>", lambda e: toggleaxes(data))
     root.bind_all("<Control-d>", lambda e: toggledebug(data))
-    root.bind_all("<Control-i>", lambda e: debugstep(data))
+    root.bind_all("<Control-i>", lambda e: stepdebug(data))
     root.bind_all("<Control-s>", lambda e: savecode(data))
     root.bind_all("<Control-e>", lambda e: saveascode(data))
     root.bind_all("<Control-l>", lambda e: loadcode(data))
