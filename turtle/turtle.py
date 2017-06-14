@@ -289,9 +289,9 @@ def get_paren_contents(expr, i=0):
 
 def test_get_paren_contents():
     print("Testing get_paren_contents...")
-    assert get_paren_contents("hi(these are the contents)") == "these are the contents")
-    assert get_paren_contents("(((yo)))") == "((yo))")
-    assert get_paren_contents("(((yo)), (hi))", 9) == "hi")
+    assert(get_paren_contents("hi(these are the contents)") == "these are the contents")
+    assert(get_paren_contents("(((yo)))") == "((yo))")
+    assert(get_paren_contents("(((yo)), (hi))", 9) == "hi")
     print("...passed!")
 
 def replace_functions_with_values(data, functions, variables, line, color, x0, y0, x1, y1, depth=0):
