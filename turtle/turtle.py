@@ -73,8 +73,12 @@ def replace_vars_with_values(data, variables, expr):
     for var in sorted_by_len:
         if var in expr:
             num_occurences = expr.count(var)
-            temp = expr.replace(var, "%r")
-            expr = temp % ((variables[var],)*num_occurences)
+            val = variables[var]
+            if type(val) == str:
+                temp = expr.replace(var, "%s")
+            else:
+                temp = expr.replace(var, "%r")
+            expr = temp % ((val,)*num_occurences)
     return expr
 
 # line: 5, lineLength: 10 x+y
@@ -278,16 +282,16 @@ def getMatchingClosingParen(expr, i=0):
 # does not include parentheses themselves
 # takes in optional starting index of left parenthesis 
 # o.w. assumes left paren at index 0
-def getParenContents(expr, i=0):
+def get_paren_contents(expr, i=0):
     lparen_i = expr.find("(", i)
     rparen_i = getMatchingClosingParen(expr, lparen_i)
     return expr[lparen_i+1:rparen_i]
 
-def testGetParenContents():
-    print("Testing getParenContents...")
-    assert(getParenContents("hi(these are the contents)") == "these are the contents")
-    assert(getParenContents("(((yo)))") == "((yo))")
-    assert(getParenContents("(((yo)), (hi))", 9) == "hi")
+def test_get_paren_contents():
+    print("Testing get_paren_contents...")
+    assert get_paren_contents("hi(these are the contents)") == "these are the contents")
+    assert get_paren_contents("(((yo)))") == "((yo))")
+    assert get_paren_contents("(((yo)), (hi))", 9) == "hi")
     print("...passed!")
 
 def replace_functions_with_values(data, functions, variables, line, color, x0, y0, x1, y1, depth=0):
@@ -300,7 +304,7 @@ def replace_functions_with_values(data, functions, variables, line, color, x0, y
             lparen_i = line.find("(", i)
             rparen_i = getMatchingClosingParen(line, lparen_i)
             name = line[:lparen_i].strip()
-            vals = getParenContents(line, lparen_i)
+            vals = get_paren_contents(line, lparen_i)
             if vals == "":
                 vals = []
             else:
@@ -342,6 +346,23 @@ def containsDigit(s):
             return True
     return False
 
+def get_str_contents(s):
+    start = s.find("\"")
+    end = s.find("\"", start + 1)
+    if end == -1:
+        return None
+    return s[start+1:end]
+
+def test_get_str_contents():
+    print("testing get_str_contents...")
+    assert(get_str_contents("hi this is a string \"and you want this stuff\"") == "and you want this stuff")
+    assert(get_str_contents("a\"\"b") == "")
+    assert(get_str_contents("a\"b\"c") == "b")
+    assert(get_str_contents("\"asdf\"") == "asdf")
+    assert(get_str_contents("asdf\"asdf") == None)
+    print("...passed!")
+
+
 """
 code: a multi-line string of "code"
 variables: a dict mapping var name (str) to value
@@ -370,8 +391,18 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
 
             (var, expr) = (line.split("<-")[0].strip(), line.split("<-")[1].strip())
             expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
-            if var == "color":
-                color = expr
+            if "\"" in expr:
+                print("this is unprocessed", repr(expr))
+                val = get_str_contents(expr)
+                print("THIS IS THE COLOR", repr(val))
+                if var == "x" or var == "y":
+                    data.error = True
+                    data.err_line = i
+                    data.err_msg = "x and y must be numbers"
+                    return None
+                if var == "color":
+                    color = val
+                variables[var] = val
             else:
                 print("367 expr", expr)
                 res = eval_expr(data, variables, expr, i)
@@ -384,6 +415,11 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     x1 = res
                 elif var == "y":
                     y1 = res
+                elif var == "color":
+                    print("setting the color here!")
+                    color = res
+                    print("this is the color", color)
+                    print("this is the color repr", repr(color))
 
         elif line.startswith("draw") and line[len("draw"):] == "":
             if color != "none":
@@ -398,7 +434,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                 start = line.find("(")
                 # revline = line[::-1]
                 # end = len(line) - revline.find(")") - 1
-                expr = getParenContents(line, start)
+                expr = get_paren_contents(line, start)
                 expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
                 cond = eval_expr(data, variables, expr, i)
 
@@ -475,7 +511,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             try: 
                 # get contents between parens
                 start = line.find("(")
-                expr = getParenContents(line, start)
+                expr = get_paren_contents(line, start)
                 # expr = line[start + 1:end]
                 print("468 expr", expr)
                 expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
@@ -584,11 +620,15 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
         elif line.startswith("print"):
             s = line[len("print("):]
             revs = s[::-1]
-            end = len(s) - revs.find(")") - 1 # finds right most paren ()
+            end = len(s) - revs.find(")") - 1 # finds right most paren (
             s = s[:end]
-            s = replace_functions_with_values(data, data.fns, variables, s, color, x0, y0, x1, y1)
-            s = replace_vars_with_values(data, variables, s)
-            s = str(eval_expr(data, variables, s, i))
+
+            if "\"" in s:
+                s = get_str_contents(s)
+            else:
+                s = replace_functions_with_values(data, data.fns, variables, s, color, x0, y0, x1, y1)
+                s = replace_vars_with_values(data, variables, s)
+                s = str(eval_expr(data, variables, s, i))
             data.print_string.append(s)
 
         elif line.startswith("break"):
@@ -1229,6 +1269,7 @@ def test_all():
     test_get_indent_body()
     test_filter_space()
     test_replace_functions_with_values()
+    test_get_str_contents()
     print("...passed!")
 
 # test_all()
