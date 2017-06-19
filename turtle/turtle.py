@@ -408,7 +408,9 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                 res = eval_expr(data, variables, expr, i)
                 print("res", res)
                 if res == None:
-                    data.err_line = i + data.err_line + 1
+                    data.err_line = i
+                    print("i ", i)
+                    print("err_line", data.err_line)
                     return 
                 variables[var] = res
                 if var == "x":
@@ -467,7 +469,8 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
 
                 if result == None and data.error: 
                     #error occured
-                    data.err_line = i + data.err_line + 1
+                    if not data.inside_fn:
+                        data.err_line = i + data.err_line + 1
                     return 
                 (returned, terminated, break_called, x0, y0, x1, y1, color, variables) = result
                 if returned:
@@ -489,7 +492,8 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                                        0, x0, y0, x1, y1, depth+4)
                 
                 if result == None and data.error: #error occured
-                    data.err_line = i + data.err_line + 1
+                    if not data.inside_fn:
+                        data.err_line = i + data.err_line + 1
                     return 
                 (returned, terminated, break_called, x0, y0, x1, y1, color, variables) = result
                 if returned:
@@ -533,7 +537,8 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                                        0, x0, y0, x1, y1)
                 
                 if result == None and data.error: # error occured
-                    data.err_line = i + data.err_line + 1
+                    if not data.inside_fn:
+                        data.err_line = i + data.err_line + 1
                     return None
 
                 (returned, terminated, break_called, x0, y0, x1, y1, color, variables) = result
@@ -597,7 +602,8 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     result = interpret(data, "".join(body), variables, 0, color, 0, x0, y0, x1, y1, depth+1)
                 data.to_repeat = temp_repeat
                 if result == None and data.error: # error occured
-                    data.err_line = i + data.err_line + 1
+                    if not data.inside_fn:
+                        data.err_line = i + data.err_line + 1
                     return 
                 (returned, terminated, break_called, x0, y0, x1, y1, color, variables) = result
                 if returned:
@@ -691,6 +697,7 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
                 f_variables["x"] = variables["x"]
                 f_variables["y"] = variables["y"]
                 f_variables["color"] = variables["color"]
+                # data.inside_fn += 1
                 for j in range(len(vals)):
                     var_name = args[j]
                     f_variables[var_name] = vals[j]
@@ -702,13 +709,14 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
                 if result == None:
                     print("fn_line_num", fn_line_num)
                     data.err_line = fn_line_num + data.err_line + 1
+                    data.inside_fn = True
                     return 
                 (_, terminated, break_called, x0, y0, x1, y1, color, _) = result
                 
                 variables["x"] = f_variables["x"]
                 variables["y"] = f_variables["y"]
                 variables["color"] = f_variables["color"]
-        
+                
                 if break_called:
                     # terminated keeps track of whether you've completed the inner loop or not
                     if (not terminated):
@@ -716,6 +724,7 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
                         # print("appending frame: ", frame)
                         data.frames.append(frame)
                         return (False, False, True, x0, y0, x1, y1, color, variables)
+                # data.inside_fn -= 1
             else:
                 data.error = True
                 data.err_msg = "invalid function name"
@@ -811,6 +820,9 @@ def init_GUI(data):
 def init_compile_data(data):
     data.fns = dict()
     data.to_repeat = None 
+    # counter used for error messages to see if you want to compound line number
+    # incs every time you enter a fn
+    data.inside_fn = False
     # data.variables = dict()
     # data.variables['x'] = 0
     # data.variables['y'] = 0
