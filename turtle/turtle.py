@@ -791,8 +791,20 @@ def runcode(data):
     variables['y'] = 0
     variables['color'] = None
     interpret(data, data.code, variables)
-    # print("frame post return: ", data.frames)
-
+    print("frame post return: ", data.frames)
+    if data.error:
+        err_msg = "Error on line %d: %s" % (data.err_line, data.err_msg)
+        data.console.configure(state="normal")
+        data.console.delete('1.0', END)
+        data.console.insert(tkinter.INSERT, err_msg)
+        data.console.configure(state="disabled")
+    else:
+        p = "\n".join(data.print_string)
+        #clear the console
+        data.console.configure(state="normal")
+        data.console.delete('1.0', END)
+        data.console.insert(tkinter.INSERT, p)
+        data.console.configure(state="disabled")
 
 def savecode(data):
     data.textbox.save(data.ver)
@@ -848,20 +860,9 @@ def draw_screens(canvas, data):
 def redrawAll(canvas, data):
     if data.axes:
         draw_axes(canvas, data)
-    if data.error:
-        err_msg = "Error on line %d: %s" % (data.err_line, data.err_msg)
-        data.console.configure(state="normal")
-        data.console.delete('1.0', END)
-        data.console.insert(tkinter.INSERT, err_msg)
-        data.console.configure(state="disabled")
-    else:
+
+    if (not data.error):
         draw_code(data.canvas, data)
-        p = "\n".join(data.print_string)
-        #clear the console
-        data.console.configure(state="normal")
-        data.console.delete('1.0', END)
-        data.console.insert(tkinter.INSERT, p)
-        data.console.configure(state="disabled")
 
 #http://stackoverflow.com/questions/16369470/tkinter-adding-line-number-to-text-widget
 class TextLineNumbers(tkinter.Canvas):
@@ -1165,7 +1166,7 @@ def run(width=1500, height=600):
     data.timerDelay = 100 # milliseconds
     data.textbox_width = width//2
     data.canvas_width = width//2
-    data.canvas_height = height//2
+    data.canvas_height = height*(5/8)
     data.bg = "#272822"
     data.outcolor ="#505050"
     data.outthick = 0.5
