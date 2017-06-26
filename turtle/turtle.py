@@ -110,6 +110,7 @@ def eval_expr(data, variables, expr, line_num):
     
     if (expr == "") : return ""
     expr = replace_vars_with_values(data, variables, expr)
+    if ("\"" in expr): return get_str_contents(expr)
     if not containsDigit(expr): return expr
     print("165", expr)
     try:
@@ -423,9 +424,18 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     print("this is the color", color)
                     print("this is the color repr", repr(color))
 
-        elif line.startswith("draw") and line[len("draw"):] == "":
+        elif line.startswith("draw"):
+            width = get_paren_contents(line)
+            line_width = 5
+            if width != "":
+                try: 
+                    line_width = int(width)
+                except: 
+                    data.error = True
+                    data.err_msg = "draw takes no arguments or one integer as the line width"
+                    data.err_line = i
             if color != "none":
-                data.to_draw.append((x0, y0, x1, y1, color, i))
+                data.to_draw.append((x0, y0, x1, y1, color, i, line_width))
             x0 = x1
             y0 = y1
         
@@ -563,7 +573,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
 
             except Exception as e:
                 data.error = True
-                data.err_msg = str(e)
+                data.err_msg = "repeat loops should be of the form \'repeat <integer>:\' followed by an indented block of code"
                 data.err_line = i 
                 return None
 
@@ -678,6 +688,7 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
             expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
             variables["return"] = eval_expr(data, variables, expr, i)
             return (True, True, False, x0, y0, x1, y1, color, variables)
+
         # here is where you run the function        
         elif "(" in line: # what if it's return ("(")
             lparen_i = line.find("(")
@@ -754,14 +765,14 @@ def draw_code(canvas, data):
     cx = data.draw_window_margin + data.draw_window_width/2
     cy = data.draw_window_margin + draw_window_height/2
     for obj in data.to_draw:
-        (x0, y0, x1, y1, color, i) = obj
+        (x0, y0, x1, y1, color, i, lw) = obj
         try:
             # negating y to account for conversion to graphical coordinates
             # to cartesian coordinates
             canvas.create_line(x0 + cx,
                                -y0 + cy, 
                                x1 + cx, 
-                               -y1 + cy, fill=color, width=5)
+                               -y1 + cy, fill=color, width=lw)
         except Exception as e:
             data.error = True
             data.err_msg = str(e)
@@ -1074,7 +1085,7 @@ class CustomTextBox(tkinter.Frame):
         return text
 
     def saveas(self):
-        self.filename =  filedialog.asksaveasfilename(initialdir = ".",title = "Select file", defaultextension=".sda")
+        self.filename =  filedialog.asksaveasfilename(initialdir = "../../",title = "Select file", defaultextension=".sda")
         if(self.filename != ""):
             contents = self.get_text()
             writeFile(self.filename, contents)
@@ -1087,7 +1098,7 @@ class CustomTextBox(tkinter.Frame):
             writeFile(self.filename, contents)
 
     def load(self, ver=None):
-        self.filename =  filedialog.askopenfilename(initialdir = ".",title = "Select file", filetypes=[('Saada file','*.sda')])
+        self.filename =  filedialog.askopenfilename(initialdir = "../../",title = "Select file", filetypes=[('Saada file','*.sda')])
         if(self.filename != ""):
             self.delete()
             contents = readFile(self.filename)
