@@ -1128,6 +1128,7 @@ class CustomTextBox(tkinter.Frame):
                 while(c < len(line)):
                     char = line[c]
                     if(char not in string.whitespace):
+                        (rinit, cinit) = (r,c)
                         initc = "%d.%d" %(r, c)
                         while(c<len(line)-1 and line[c+1] not in string.whitespace):
                             # print("finding word", char, c)
@@ -1142,12 +1143,18 @@ class CustomTextBox(tkinter.Frame):
                             self.text.tag_remove(tag, initc, endc)
 
                         #apply tags
-                        if word in self.keywords:
-                            self.text.tag_add("keyword", initc, endc)
-                        elif word in self.debug:
-                            self.text.tag_add("debug", initc, endc)
-                        elif word in self.bool:
-                            self.text.tag_add("bool", initc, endc)
+                        for key in self.keywords:
+                            if(word.startswith(key)):
+                                endc = "%d.%d" % (rinit, cinit + len(key))
+                                self.text.tag_add("keyword", initc, endc)
+                        for key in self.debug:
+                            if(word.startswith(key)):
+                                endc = "%d.%d" % (rinit, cinit + len(key))
+                                self.text.tag_add("debug", initc, endc)
+                        for key in self.bool:
+                            if(word.startswith(key)):
+                                endc = "%d.%d" % (rinit, cinit + len(key))
+                                self.text.tag_add("bool", initc, endc)
                     c+= 1
 
                 #highlight strings
