@@ -18,30 +18,23 @@ Current features:
   - while loops
   - functions -> when you return you need to skip the rest of the fn  
   - TODO:
-   - adjust pen width
    - super clear error handling
    - range -> actually implement it
-   - confirm that debug-mode works correctly with fns** (it doesn't. lmao)
+   - confirm that debug-mode works correctly with fns**
    - convert everything to data
    - self-check on drawing game
    - error handling <- uncomment all the excepts
    - time.sleep -> ("wait")
  
 """
-# Begin writing interpreter for Adaas <- saada
-#from tkinter import *
-#from Modules.numericStringParser import NumericStringParser 
+# Begin writing interpreter for saada
 from tkinter.scrolledtext import *
 import tkinter
 import string
 import math
 import random
 from tkinter import filedialog
-
-
-# Begin writing interpreter for Adaas <- saada
 from tkinter import *
-# from Modules.numericStringParser import NumericStringParser 
 
 # taken from http://www.kosbie.net/cmu/fall-14/15-112/notes/file-and-web-io.py
 def readFile(filename, mode="rt"):
@@ -56,7 +49,7 @@ def writeFile(filename, contents, mode="wt"):
         fout.write(contents)
 
 # helper function that replaces variable name in expression 
-# with the variables actual value
+# with the variable's actual value
 # variables:dict<str, _> - maps variable names to vals
 # expr:str - expression containing some or no var names
 
@@ -74,8 +67,9 @@ def replace_vars_with_values(data, variables, expr):
         if var in expr:
             num_occurences = expr.count(var)
             val = variables[var]
+            # NOTE YOU CHANGED %s -> %r THIS MIGHT CAUSE PROBLEMS WHEN YOU PRINT
             if type(val) == str:
-                temp = expr.replace(var, "%s")
+                temp = expr.replace(var, "%r")
             else:
                 temp = expr.replace(var, "%r")
             expr = temp % ((val,)*num_occurences)
@@ -105,14 +99,23 @@ def test_replace_vars_with_vals():
 # i is the line number of code being evaluated
 # if expr doesn't result in a valid expr, None is returned and the error flag
 #   is set
-def eval_expr(data, variables, expr, line_num):
+def eval_expr(data, variables, expr, line_num, orig_expr=""):
     assert(type(variables)==dict)
     
-    if (expr == "") : return ""
+    if (expr == ""): return ""
+    print("112", expr)
     expr = replace_vars_with_values(data, variables, expr)
-    if ("\"" in expr): return get_str_contents(expr)
-    if not containsDigit(expr): return expr
-    print("165", expr)
+    print("114", expr)
+    if (("\"" in expr) or ("\'" in expr)): 
+        print("here")
+        return get_str_contents(expr)
+    if containsAlpha(expr):
+        data.error = True
+        err_expr = expr if orig_expr == "" else orig_expr
+        data.err_msg = "[%s] is not a valid expression as some of the terms are not defined, did you mean [\"%s\"]?" % (err_expr, err_expr)
+        data.err_line = line_num
+        return None
+    print("122", expr)
     try:
         safe_syms = "<>/*+-.()%="
         for c in expr:
@@ -121,8 +124,8 @@ def eval_expr(data, variables, expr, line_num):
                 data.err_msg = "expression contains invalid symbol: %s" % expr
                 data.err_line = line_num
                 return None    
-        if ("range" in expr): 
-            return list(eval(expr))
+        # if ("range" in expr): 
+        #     return list(eval(expr))
         return eval(expr)
     except Exception as e:
         data.error = True
@@ -320,8 +323,8 @@ def replace_functions_with_values(data, functions, variables, line, color, x0, y
                 
                 # vals = [replace_functions_with_values(data, functions, variables, expr, color, x0, y0, x1, y1) if containsFunction(functions, expr) else expr for expr in vals]
                 vals = [eval_expr(data, variables, expr, i) for expr in tempvals]
-            (_, args, body) = functions[fn_name]
-            f_variables = dict()
+            (fn_line, args, body) = functions[fn_name]
+            f_variables = init_variables()
             f_variables["x"] = variables["x"]
             f_variables["y"] = variables["y"]
             f_variables["color"] = variables["color"]
@@ -331,6 +334,9 @@ def replace_functions_with_values(data, functions, variables, line, color, x0, y
             # 0, color, 0, x0, y0, x1, y1
             result = interpret(data, body, f_variables, 0, color, 0, x0, y0, x1, y1, depth=depth+4)
             if result == None:
+                if not data.inside_fn:
+                    data.err_line = fn_line + data.err_line + 1
+                data.inside_fn = True
                 return
             (_, _, _, x0, y0, x1, y1, color, _) = result
             variables["x"] = f_variables["x"]
@@ -347,11 +353,20 @@ def containsDigit(s):
             return True
     return False
 
+# checks if there are any alphabet characters in the expr
+def containsAlpha(s):
+    for c in s:
+        if c.isalpha():
+            return True
+    return False
+
 def get_str_contents(s):
-    start = s.find("\"")
-    end = s.find("\"", start + 1)
+    delim = "\"" if "\"" in s else "\'"
+    start = s.find(delim)
+    end = s.find(delim, start + 1)
     if end == -1:
         return None
+    print("returning %r from get_str_contents" % s[start+1:end])
     return s[start+1:end]
 
 def test_get_str_contents():
@@ -381,37 +396,38 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
     n = len(code_lines)
     while (i < n):
         line = code_lines[i]
-        print("i: ", i)
-        print("processing line:", line)
-        
+
+        if line[0].isspace():
+            data.error = True
+            data.err_msg = "unexpected or extra white space at the start of the line"
+            data.err_line = i
+            return None
+
         if "<-" in line:
             if (len(line.split("<-")) < 2):
                 data.error = True
                 data.err_msg = "should be of the form \'variable_name <- value\'"
                 data.err_line = i
+                return None
 
             (var, expr) = (line.split("<-")[0].strip(), line.split("<-")[1].strip())
             expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
             if "\"" in expr:
-                print("this is unprocessed", repr(expr))
                 val = get_str_contents(expr)
-                print("THIS IS THE COLOR", repr(val))
                 if var == "x" or var == "y":
                     data.error = True
                     data.err_line = i
-                    data.err_msg = "x and y must be numbers"
+                    data.err_msg = "x and y must be integers"
                     return None
                 if var == "color":
                     color = val
                 variables[var] = val
             else:
-                print("367 expr", expr)
                 res = eval_expr(data, variables, expr, i)
-                print("res", res)
+                print("427 result", res)
                 if res == None:
+                    data.error = True
                     data.err_line = i
-                    print("i ", i)
-                    print("err_line", data.err_line)
                     return 
                 variables[var] = res
                 if var == "x":
@@ -419,21 +435,24 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                 elif var == "y":
                     y1 = res
                 elif var == "color":
-                    print("setting the color here!")
                     color = res
-                    print("this is the color", color)
-                    print("this is the color repr", repr(color))
 
-        elif line.startswith("draw"):
+        elif line.startswith("draw("):
+            if "(" not in line:
+                data.error = True
+                data.err_msg = "draw takes no arguments or one integer as the line width"
+                data.err_line = i
+                return None
             width = get_paren_contents(line)
             line_width = 5
             if width != "":
-                try: 
-                    line_width = int(width)
-                except: 
+                line_width = eval_expr(data, variables, width, i)
+
+                if not isinstance(line_width, int): 
                     data.error = True
                     data.err_msg = "draw takes no arguments or one integer as the line width"
                     data.err_line = i
+                    return None 
             if color != "none":
                 data.to_draw.append((x0, y0, x1, y1, color, i, line_width))
             x0 = x1
@@ -444,8 +463,6 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             try: 
                 # get contents between parens <- you can make that a helper function
                 start = line.find("(")
-                # revline = line[::-1]
-                # end = len(line) - revline.find(")") - 1
                 expr = get_paren_contents(line, start)
                 expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
                 cond = eval_expr(data, variables, expr, i)
@@ -454,12 +471,13 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                 data.error = True
                 data.err_msg = str(e)
                 data.err_line = i 
+                return None
 
-            if (cond == None): 
+            if (cond is None): 
                 data.error = True
                 data.err_msg = str("Condition not set")
                 data.err_line = i 
-                return 
+                return None
             (body, k) = get_indent_body(data, code_lines, i + 1)
             
             else_exists = False
@@ -491,7 +509,6 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                         frame = (variables, k, color, 0, x0, y0, x1, y1)
                     else:
                         frame = (variables, i, color, 0, x0, y0, x1, y1)
-                    # print("434 appending frame: ", frame)
                     data.frames.append(frame)
                     return (False, False, True, x0, y0, x1, y1, color, variables)
             elif (else_exists):
@@ -514,8 +531,6 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                         frame = (variables, k, color, 0, x0, y0, x1, y1)
                     else:
                         frame = (variables, i, color, 0, x0, y0, x1, y1)
-                   
-                    # print("appending frame: ", frame)
                     data.frames.append(frame)
                     return (False, False, True, x0, y0, x1, y1, color, variables)
         
@@ -526,16 +541,14 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                 # get contents between parens
                 start = line.find("(")
                 expr = get_paren_contents(line, start)
-                # expr = line[start + 1:end]
-                print("468 expr", expr)
                 expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
                 cond = eval_expr(data, variables, expr, i)
 
             except Exception as e:
                 data.error = True
                 data.err_msg = str(e)
-                print(e)
                 data.err_line = i 
+                return None
 
             (body, k) = get_indent_body(data, code_lines, i + 1)
 
@@ -560,7 +573,6 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     if not cond and terminated: # this is the final iter of loop
                         i = k
                     frame = (variables, i, color, int(not(terminated)), x0, y0, x1, y1)
-                    print("appending frame in while: ", frame)
                     data.frames.append(frame)
                     return (False, False, True, x0, y0, x1, y1, color, variables)
                 expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
@@ -568,6 +580,11 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
 
         elif line.startswith("repeat"): 
             # get the number between the end of repeat and before the colon
+            if ":" not in line:
+                data.error = True
+                data.err_msg = "repeat loops should be of the form \'repeat <integer>:\' followed by an indented block of code"
+                data.err_line = i 
+                return None
             try:
                 expr = line.split(":")[0][len("repeat"):].strip()
 
@@ -577,7 +594,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                 data.err_line = i 
                 return None
 
-            if data.to_repeat == None:
+            if data.to_repeat == None: # this needs to become something that varies with interpret call
                 expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
                 m = eval_expr(data, variables, expr, i)
                 if m < 0:
@@ -589,9 +606,6 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             
 
             body, k = get_indent_body(data, code_lines, i + 1)
-            # print("repeat loop body:\n", "".join(body))
-            # print(k)
-            # never entered the while loop
             if k == i + 1: 
                 data.error = True
                 data.err_msg = "no content to repeat\n\
@@ -604,14 +618,12 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                 temp_repeat = data.to_repeat
                 data.to_repeat = None
                 if data.frames != []:
-                    # print(data.frames)
                     frame = data.frames.pop()
-                    # print("550 frame: ", frame)
                     result = interpret(data, "".join(body), *(frame), depth=depth+4)   
                 else: 
                     result = interpret(data, "".join(body), variables, 0, color, 0, x0, y0, x1, y1, depth+1)
                 data.to_repeat = temp_repeat
-                if result == None and data.error: # error occured
+                if result is None and data.error: # error occured
                     if not data.inside_fn:
                         data.err_line = i + data.err_line + 1
                     return 
@@ -626,7 +638,6 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     # terminated keeps track of whether you've completed the inner loop or not
                     if (terminated): repeated += 1
                     frame = (variables, i, color, repeated, x0, y0, x1, y1)
-                    # print("appending frame: ", frame)
                     data.frames.append(frame)
                     return (False, False, True, x0, y0, x1, y1, color, variables)
                 
@@ -634,25 +645,32 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
             i = k - 1
 
         elif line.startswith("print"):
-            s = line[len("print("):]
-            revs = s[::-1]
-            end = len(s) - revs.find(")") - 1 # finds right most paren (
-            s = s[:end]
-
-            if "\"" in s:
+            if "(" not in line:
+                data.error = True
+                data.err_msg = "print is a function and needs parentheses,\
+                 for example: print(\"hello world\")"
+                data.err_line = i
+                return None
+            orig_expr = get_paren_contents(line)
+            s = orig_expr
+            if "\"" in orig_expr:
                 s = get_str_contents(s)
             else:
-                s = replace_functions_with_values(data, data.fns, variables, s, color, x0, y0, x1, y1)
-                s = replace_vars_with_values(data, variables, s)
-                s = str(eval_expr(data, variables, s, i))
-            data.print_string.append(s)
+                if "(" in orig_expr:
+                    s = replace_functions_with_values(data, data.fns, variables, 
+                        s, color, x0, y0, x1, y1)
+                    if s == None:
+                        return None
+                s = eval_expr(data, variables, s, i, orig_expr)
+                if s == None:
+                    return 
+            data.print_string.append(str(s))
 
         elif line.startswith("break"):
             frame = (variables, i + 1, color, 0, x0, y0, x1, y1)
             
             if (i + 1) == n:
                 return (False, True, True, x0, y0, x1, y1, color, variables)
-            # print("595 appending frame: ", frame)
             data.frames.append(frame)
             return (False, False, True, x0, y0, x1, y1, color, variables)
 
@@ -665,6 +683,7 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                     data.error = True
                     data.err_msg = "missing : in function definition\ne.g. def foo(n):"
                     data.err_line = i 
+                    return None
                 offset = 4 
                 fn_name = line[offset:lparen_i]
                 args = line[lparen_i+1:rparen_i]
@@ -676,7 +695,6 @@ def interpret(data, code, variables, i=0, color="", repeated=0, x0=0, y0=0,
                 
                 
             except Exception as e:
-                # print(e)
                 data.error = True
                 data.err_msg = "\nfunction definition should be \
 of the form\ndef function_name(argument1, argument2, argument3):\n\t#code content goes here"
@@ -686,7 +704,12 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
         elif line.startswith("return"):
             expr = line[len("return"):].strip()
             expr = replace_functions_with_values(data, data.fns, variables, expr, color, x0, y0, x1, y1)
-            variables["return"] = eval_expr(data, variables, expr, i)
+            if expr == None:
+                return None
+            result = eval_expr(data, variables, expr, i)
+            if result == None:
+                return None
+            variables["return"] = result
             return (True, True, False, x0, y0, x1, y1, color, variables)
 
         # here is where you run the function        
@@ -704,7 +727,7 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
                 vals = [eval_expr(data, variables, expr, i) for expr in vals]
             if name in data.fns:
                 (fn_line_num, args, body) = data.fns[name]
-                f_variables = dict()
+                f_variables = init_variables()
                 f_variables["x"] = variables["x"]
                 f_variables["y"] = variables["y"]
                 f_variables["color"] = variables["color"]
@@ -717,9 +740,10 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
                     result = interpret(data, "".join(body), *data.frames.pop())    
                 else: 
                     result = interpret(data, body, f_variables, 0, color, 0, x0, y0, x1, y1, depth=depth+4)
-                if result == None:
-                    print("fn_line_num", fn_line_num)
-                    data.err_line = fn_line_num + data.err_line + 1
+                print("737 result", result)
+                if result is None:
+                    if not data.inside_fn:
+                        data.err_line = fn_line_num + data.err_line + 1
                     data.inside_fn = True
                     return 
                 (_, terminated, break_called, x0, y0, x1, y1, color, _) = result
@@ -732,27 +756,19 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code conten
                     # terminated keeps track of whether you've completed the inner loop or not
                     if (not terminated):
                         frame = (variables, i, color, 0, x0, y0, x1, y1)
-                        # print("appending frame: ", frame)
                         data.frames.append(frame)
                         return (False, False, True, x0, y0, x1, y1, color, variables)
-                # data.inside_fn -= 1
             else:
                 data.error = True
                 data.err_msg = "invalid function name"
                 data.err_line = i
                 return None
-            # replace any variable names with args with stuff
-            # replace variables in body with values
-            # ok what you need to do is you need to make the dict with the general variables
-            # info, an arg so this is one of the things that can't be packed into data...
-        
 
         else:
-            # print some exception
-            print("invalid starting keyword")
             data.error = True
-            data.err_msg = "invalid starting keyword"
+            data.err_msg = "invalid starting keyword: %s" % line
             data.err_line = i 
+            print(data.err_msg)
             return None
     
         i += 1
@@ -777,6 +793,7 @@ def draw_code(canvas, data):
             data.error = True
             data.err_msg = str(e)
             data.err_line = i 
+            return None
 
 def draw_axes(canvas, data):
     cwidth = canvas.winfo_width()
@@ -845,6 +862,15 @@ def init_compile_data(data):
     data.frames = []
     data.print_string = []
 
+def init_variables():
+    variables = dict()
+    variables['x'] = 0
+    variables['y'] = 0
+    variables['color'] = None
+    variables['True'] = 1
+    variables['False'] = 0
+    return variables
+
 def init(data):
     init_GUI(data)
     init_compile_data(data)
@@ -859,10 +885,7 @@ def init(data):
     data.err_line = 0
     data.err_msg = ""
     data.code = ""
-    variables = dict()
-    variables['x'] = 0
-    variables['y'] = 0
-    variables['color'] = None
+    variables = init_variables()
     interpret(data, data.code, variables)
 
 def mousePressed(event, data):
@@ -905,14 +928,12 @@ def toggledebug(data):
 def stepdebug(data):
     while len(data.frames) > 0:
         frame = data.frames.pop()
-        # print("popped frame:", frame)
         result = interpret(data, data.code, *frame)
         if result == None: # an error occured
             data.frames = []
             return 
         (_, _, break_called, x0, y0, x1, y1, color, variables) = result
         if break_called:
-            # print("frame post c: ", data.frames)
             return
 
 
