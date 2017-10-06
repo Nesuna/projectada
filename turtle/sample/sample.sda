@@ -1,0 +1,19 @@
+def f(t): 
+    x<-t+10
+    color<-"blue"
+    draw()
+ 
+f(10)
+break
+ 
+def g(n, m):
+    repeat n:
+        print("this is x")
+        print(x)
+        x<-x+m
+        color<-"black"
+        draw(5)
+ 
+g(1, 10)
+break
+g(3, 10)
