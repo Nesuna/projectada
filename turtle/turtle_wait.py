@@ -344,6 +344,7 @@ def replace_functions_with_values(data, functions, variables, line, color, x0,
             rparen_i = getMatchingClosingParen(line, lparen_i)
             name = line[:lparen_i].strip()
             vals = get_paren_contents(line, lparen_i)
+            print("vals 347", vals) # need to do error check here -> if it's an undefined variable
             if vals == "":
                 vals = []
             else:
@@ -365,29 +366,45 @@ def replace_functions_with_values(data, functions, variables, line, color, x0,
             f_variables["x"] = variables["x"]
             f_variables["y"] = variables["y"]
             f_variables["color"] = variables["color"]
+            print("args", args)
+            print("vals", vals)
+            if len(args) != len(vals):
+                msg = "function %s expected %d arguments but received %d arguments instead." % (fn_name, len(args), len(vals))
+                return create_error(data, msg, i)
             for j in range(len(vals)):
                 var_name = args[j]
                 f_variables[var_name] = vals[j]
 
-            # 0, color, 0, x0, y0, x1, y1
-            new_compile_data = CompileData("".join(body), 
-                variables=f_variables,
-                color=color,
-                x0=x0,
-                y0=y0,
-                x1=x1,
-                y1=y1)
-            result = interpret(data, new_compile_data)
+            # if stack frames not empty, pop and execute
+            code_body = "".join(body)
+            if data.frames:
+                print("here")
+                print(data.frames[-1])
+                print(code_body)
+                new_compile_data = CompileData(code_body, *data.frames.pop())
+                result = interpret(data, new_compile_data)
+            else:
+                # 0, color, 0, x0, y0, x1, y1
+                new_compile_data = CompileData(code_body, 
+                    variables=f_variables,
+                    color=color,
+                    x0=x0,
+                    y0=y0,
+                    x1=x1,
+                    y1=y1)
+                result = interpret(data, new_compile_data)
             if result == None:
                 if not data.inside_fn:
                     data.err_line = fn_line + data.err_line + 1
                 data.inside_fn = True
                 return
-            # (_, _, _, x0, y0, x1, y1, color, _) = result
-            variables["x"] = f_variables["x"]
-            variables["y"] = f_variables["y"]
-            variables["color"] = f_variables["color"]
-            line = (line[:i] + "%r" + line[rparen_i+1:]) % f_variables["return"]
+
+            variables["x"] = result.variables["x"]
+            variables["y"] = result.variables["y"]
+            variables["color"] = result.variables["color"]
+            if (result.break_called or result.wait_duration) and not result.terminated:
+                return result               
+            line = (line[:i] + "%r" + line[rparen_i+1:]) % result.variables["return"]
             i = line.find(fn_name)
     return line
 
@@ -461,6 +478,27 @@ def interpret(data, compile_data):
                 compile_data.variables, expr, compile_data.color, 
                 compile_data.x0, compile_data.y0, compile_data.x1, 
                 compile_data.y1)
+            if expr is None:
+                #error occured
+                if not data.inside_fn:
+                    data.err_line = i + data.err_line + 1
+                return None
+            elif isinstance(expr, ReturnData): # break called
+                frame = (compile_data.variables, compile_data.i, 
+                            compile_data.color, compile_data.to_repeat, 0, 
+                            compile_data.x0, compile_data.y0, compile_data.x1, 
+                            compile_data.y1)
+                data.frames.append(frame)
+                return ReturnData(returned=False,
+                    terminated=False, 
+                    break_called=expr.break_called,
+                    x0=compile_data.x0, 
+                    y0=compile_data.y0, 
+                    x1=compile_data.x1, 
+                    y1=compile_data.y1,
+                    wait_duration=expr.wait_duration,
+                    color=compile_data.color, 
+                    variables=compile_data.variables)
             if "\"" in expr:
                 val = get_str_contents(expr)
                 if var == "x" or var == "y":
@@ -542,11 +580,9 @@ def interpret(data, compile_data):
 
             (body, k) = get_indent_body(data, compile_data.code.splitlines(), compile_data.i + 1)
             
-            
-            
             if (cond):
 
-                if data.frames != []:
+                if data.frames:
                     new_compile_data = CompileData("".join(body), *data.frames.pop())
                     result = interpret(data, new_compile_data)    
                 else: 
@@ -600,7 +636,6 @@ def interpret(data, compile_data):
                            code[k+1].startswith("elif")))
             satisfied = cond
             while (check_elif):
-                print("entered loop")
                 cond = None
                 # get contents between parens
                 expr = get_paren_contents(code[k])
@@ -1052,6 +1087,7 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code\
                 vals = []
             else:
                 vals = [elem.strip() for elem in vals.split(",")]
+                # if break is called when you're replacing functions with values?
                 vals = [replace_functions_with_values(data, data.fns, 
                     compile_data.variables, expr, compile_data.color, 
                     compile_data.x0, compile_data.y0, compile_data.x1, 
@@ -1119,8 +1155,6 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code\
                             color=compile_data.color,
                             variables=compile_data.variables)
                         return return_data
-                        # return (False, False, True, x0, y0, 
-                        #     x1, y1, color, variables)
             else:
                 msg = "%s is not a defined function" % name
                 return create_error(data, msg, compile_data.i)
@@ -1234,6 +1268,7 @@ def init_variables():
     variables['color'] = None
     variables['True'] = 1
     variables['False'] = 0
+    # variables['return'] = None
     return variables
 
 def init(data):
