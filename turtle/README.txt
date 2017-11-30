@@ -36,6 +36,8 @@ Basic Syntax:
     
     variable assignment     <- 
 
+    wait                    wait(<a number in seconds>)
+
  Using Functions
      
      define a function       def fn_name(arg1, arg2)
@@ -61,24 +63,24 @@ Basic Syntax:
      draw([width])           draws from second to last point to last point set, 
                              optionally accepts integer argument for line width
 
- Sample Code:
+ Sample Code (also in sample.sda):
 
     def f(t):
          x<-t+10
-         color<-blue
-         draw
+         color<-"blue"
+         draw()
  
-     f(10)
-     break
+    f(10)
+    break
  
-     def g(n, m):
-         repeat n:
-             print("this is x")
-             print(x)
-             x<-x+m
-             color<-black
-             draw
+    def g(n, m):
+        repeat n:
+            print("this is x")
+            print(x)
+            x<-x+m
+            color<-"black"
+            draw(5)
  
-     g(1, 10)
-     break
-     g(3, 10)
+    g(1, 10)
+    break
+    g(3, 10)
