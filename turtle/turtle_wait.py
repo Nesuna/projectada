@@ -43,6 +43,23 @@ class CompileData(object):
         self.x1 = x1
         self.y1 = y1
 
+    def __repr__(self):
+        rep = [
+        'code=%r' % self.code,
+        'variables=%r' % self.variables,
+        'i=%r' % self.i,
+        'color=%r' % self.color,
+        'to_repeat=%r' % self.to_repeat,
+        'repeated=%r' % self.repeated,
+        'x0=%r' % self.x0,
+        'y0=%r' % self.y0,
+        'x1=%r' % self.x1,
+        'y1=%r' % self.y1
+        ]
+        return 'CompileData(\n%s\n)' % '\n'.join(rep)
+
+
+
 
 class ReturnData(object):
     def __init__(self, returned=False, terminated=False,
@@ -381,8 +398,7 @@ def replace_functions_with_values(data, functions, variables, line, color, x0,
                 print("here")
                 print(data.frames[-1])
                 print(code_body)
-                new_compile_data = CompileData(code_body, *data.frames.pop())
-                result = interpret(data, new_compile_data)
+                result = interpret(data, data.frames.pop())
             else:
                 # 0, color, 0, x0, y0, x1, y1
                 new_compile_data = CompileData(code_body, 
@@ -460,11 +476,7 @@ def interpret(data, compile_data):
         line = code[compile_data.i]
         # print(line)
         if line[0].isspace():
-            print(line)
-            msg = "unexpected or extra white space at the start of the\
- line"      
-            print(code)
-            print("HELLO I'M HERE")
+            msg = "unexpected or extra white space at the start of the line"     
             return create_error(data, msg, compile_data.i)
 
         if "<-" in line:
@@ -483,11 +495,17 @@ def interpret(data, compile_data):
                 if not data.inside_fn:
                     data.err_line = i + data.err_line + 1
                 return None
-            elif isinstance(expr, ReturnData): # break called
-                frame = (compile_data.variables, compile_data.i, 
-                            compile_data.color, compile_data.to_repeat, 0, 
-                            compile_data.x0, compile_data.y0, compile_data.x1, 
-                            compile_data.y1)
+            # if the line was changed, you want to document that somehow
+            elif isinstance(expr, ReturnData): # break or wait called
+                frame = CompileData(code="\n".join(code),
+                                    variables=compile_data.variables,
+                                    i=compile_data.i,
+                                    color=compile_data.color,
+                                    to_repeat=compile_data.to_repeat,
+                                    x0=compile_data.x0,
+                                    y0=compile_data.y0,
+                                    x1=compile_data.x1,
+                                    y1=compile_data.y1)
                 data.frames.append(frame)
                 return ReturnData(returned=False,
                     terminated=False, 
@@ -583,8 +601,8 @@ def interpret(data, compile_data):
             if (cond):
 
                 if data.frames:
-                    new_compile_data = CompileData("".join(body), *data.frames.pop())
-                    result = interpret(data, new_compile_data)    
+                    # new_compile_data = CompileData("".join(body), *data.frames.pop())
+                    result = interpret(data, data.frames.pop())    
                 else: 
                     new_compile_data = CompileData(
                         code="".join(body), 
@@ -611,15 +629,19 @@ def interpret(data, compile_data):
                     return ret
                 if result.break_called or result.wait_duration:
                     # frame is line number, color, #repeats, and coord vals
+                    frame = CompileData(code=compile_data.code,
+                                        variables=compile_data.variables,
+                                        color=compile_data.color,
+                                        to_repeat=compile_data.to_repeat,
+                                        x0=compile_data.x0,
+                                        y0=compile_data.y0,
+                                        x1=compile_data.x1,
+                                        y1=compile_data.y1
+                                        )
                     if result.terminated:
-                        frame = (compile_data.variables, k, compile_data.color, 
-                            compile_data.to_repeat, 0, compile_data.x0, 
-                            compile_data.y0, compile_data.x1, compile_data.y1)
+                        frame.i = k
                     else:
-                        frame = (compile_data.variables, compile_data.i, 
-                            compile_data.color, compile_data.to_repeat, 0, 
-                            compile_data.x0, compile_data.y0, compile_data.x1, 
-                            compile_data.y1)
+                        frame.i = compile_data.i
                     data.frames.append(frame)
                     return ReturnData(returned=False,
                         terminated=False, 
@@ -655,9 +677,9 @@ def interpret(data, compile_data):
                 if cond and not satisfied:
                     satisfied = True
                     if data.frames != []:
-                        new_compile_data = CompileData("".join(elif_body), 
-                            *data.frames.pop())
-                        result = interpret(data, new_compile_data)
+                        # new_compile_data = CompileData("".join(elif_body), 
+                        #     *data.frames.pop())
+                        result = interpret(data, data.frames.pop())
                         # result = interpret(data, else_body, *data.frames.pop())    
                     else:
                         new_compile_data = CompileData(
@@ -689,15 +711,19 @@ def interpret(data, compile_data):
                         # return (True, False, True, x0, y0, x1, y1, color, variables)
                     if result.break_called or result.wait_duration: # can't hit both break and return
                         # frame is line number, color, #repeats, and coord vals
+                        frame = CompileData(code=compile_data.code,
+                                        variables=compile_data.variables,
+                                        color=compile_data.color,
+                                        to_repeat=compile_data.to_repeat,
+                                        x0=compile_data.x0,
+                                        y0=compile_data.y0,
+                                        x1=compile_data.x1,
+                                        y1=compile_data.y1
+                                        )
                         if result.terminated:
-                            frame = (compile_data.variables, k, compile_data.color, 
-                                compile_data.to_repeat, 0, compile_data.x0, 
-                                compile_data.y0, compile_data.x1, compile_data.y1)
+                            frame.i = k
                         else:
-                            frame = (compile_data.variables, compile_data.i, 
-                                compile_data.color, compile_data.to_repeat, 0, 
-                                compile_data.x0, compile_data.y0, compile_data.x1, 
-                                compile_data.y1)
+                            frame.i = compile_data.i
                         data.frames.append(frame)
                         ret = ReturnData(returned=False,
                             terminated=False,
@@ -726,9 +752,9 @@ def interpret(data, compile_data):
 
             if (else_exists and not satisfied):
                 if data.frames != []:
-                    new_compile_data = CompileData("".join(else_body), 
-                        *data.frames.pop())
-                    result = interpret(data, new_compile_data)
+                    # new_compile_data = CompileData("".join(else_body), 
+                    #     *data.frames.pop())
+                    result = interpret(data, data.frames.pop())
                     # result = interpret(data, else_body, *data.frames.pop())    
                 else:
                     new_compile_data = CompileData(
@@ -759,16 +785,19 @@ def interpret(data, compile_data):
                     return ret
                     # return (True, False, True, x0, y0, x1, y1, color, variables)
                 if result.break_called or result.wait_duration: # can't hit both break and return
-                    # frame is line number, color, #repeats, and coord vals
+                    frame = CompileData(code=compile_data.code,
+                                        variables=compile_data.variables,
+                                        color=compile_data.color,
+                                        to_repeat=compile_data.to_repeat,
+                                        x0=compile_data.x0,
+                                        y0=compile_data.y0,
+                                        x1=compile_data.x1,
+                                        y1=compile_data.y1
+                                        )
                     if result.terminated:
-                        frame = (compile_data.variables, k, compile_data.color, 
-                            compile_data.to_repeat, 0, compile_data.x0, 
-                            compile_data.y0, compile_data.x1, compile_data.y1)
+                        frame.i = k
                     else:
-                        frame = (compile_data.variables, compile_data.i, 
-                            compile_data.color, compile_data.to_repeat, 0, 
-                            compile_data.x0, compile_data.y0, compile_data.x1, 
-                            compile_data.y1)
+                        frame.i = compile_data.i
                     data.frames.append(frame)
                     ret = ReturnData(returned=False,
                         terminated=False,
@@ -796,9 +825,9 @@ def interpret(data, compile_data):
             (body, k) = get_indent_body(data, code, compile_data.i + 1)
             while (cond or compile_data.repeated): # repeated seems to be keeping track of whether the loop terminated? oh.
                 if data.frames != []:
-                    new_compile_data = CompileData("".join(body), 
-                        *data.frames.pop())
-                    result = interpret(data, new_compile_data)    
+                    # new_compile_data = CompileData("".join(body), 
+                    #     *data.frames.pop())
+                    result = interpret(data, data.frames.pop())    
                 else: 
                     new_compile_data = CompileData(
                         code="".join(body),
@@ -841,10 +870,21 @@ def interpret(data, compile_data):
                     cond = eval_expr(data, compile_data.variables, expr, compile_data.i)
                     if not cond and result.terminated: # this is the final iter of loop
                         i = k
-                    frame = (compile_data.variables, compile_data.i, 
-                        compile_data.color, compile_data.to_repeat, 
-                        int(not(result.terminated)), compile_data.x0, 
-                        compile_data.y0, compile_data.x1, compile_data.y1)
+                    frame = CompileData(code=compile_data.code,
+                                        variables=compile_data.variables,
+                                        i=compile_data.i,
+                                        color=compile_data.color,
+                                        to_repeat=compile_data.to_repeat,
+                                        repeated=int(not(result.terminated)),
+                                        x0=compile_data.x0,
+                                        y0=compile_data.y0,
+                                        x1=compile_data.x1,
+                                        y1=compile_data.y1
+                                        )
+                    # frame = (compile_data.variables, compile_data.i, 
+                    #     compile_data.color, compile_data.to_repeat, 
+                    #     int(not(result.terminated)), compile_data.x0, 
+                    #     compile_data.y0, compile_data.x1, compile_data.y1)
                     data.frames.append(frame)
                     return_data = ReturnData(
                         break_called=result.break_called,
@@ -906,8 +946,8 @@ def interpret(data, compile_data):
                 compile_data.to_repeat = None
                 if data.frames != []:
                     frame = data.frames.pop()
-                    new_compile_data = CompileData("".join(body), *(frame))
-                    result = interpret(data, new_compile_data)   
+                    # new_compile_data = CompileData("".join(body), frame))
+                    result = interpret(data, frame)   
                 else: 
                     new_compile_data = CompileData("".join(body),
                         variables=compile_data.variables,
@@ -934,11 +974,21 @@ def interpret(data, compile_data):
     
                     # terminated keeps track of whether you've completed the inner loop or not
                     if (result.terminated): compile_data.repeated += 1
-                    frame = (compile_data.variables, compile_data.i, 
-                        compile_data.color, compile_data.to_repeat, 
-                        compile_data.repeated + j, 
-                        compile_data.x0, compile_data.y0, 
-                        compile_data.x1, compile_data.y1)
+                    frame = CompileData(code=compile_data.code,
+                                        variables=compile_data.variables,
+                                        i=compile_data.i,
+                                        color=compile_data.color,
+                                        to_repeat=compile_data.to_repeat,
+                                        repeated=compile_data.repeated+j,
+                                        x0=compile_data.x0,
+                                        y0=compile_data.y0,
+                                        x1=compile_data.x1,
+                                        y1=compile_data.y1)
+                    # frame = (compile_data.variables, compile_data.i, 
+                    #     compile_data.color, compile_data.to_repeat, 
+                    #     compile_data.repeated + j, 
+                    #     compile_data.x0, compile_data.y0, 
+                    #     compile_data.x1, compile_data.y1)
                     data.frames.append(frame)
                     return_data = ReturnData(
                         returned=False,
@@ -983,9 +1033,19 @@ def interpret(data, compile_data):
             data.print_string.append(str(s))
 
         elif line.startswith("break"):
-            frame = (compile_data.variables, compile_data.i + 1, 
-                compile_data.color, compile_data.to_repeat, 0, compile_data.x0, 
-                compile_data.y0, compile_data.x1, compile_data.y1)
+            frame = CompileData(code=compile_data.code,
+                                variables=compile_data.variables,
+                                i=compile_data.i + 1,
+                                color=compile_data.color,
+                                to_repeat=compile_data.to_repeat,
+                                x0=compile_data.x0,
+                                y0=compile_data.y0,
+                                x1=compile_data.x1,
+                                y1=compile_data.y1
+                                )
+            # frame = (compile_data.variables, compile_data.i + 1, 
+            #     compile_data.color, compile_data.to_repeat, 0, compile_data.x0, 
+            #     compile_data.y0, compile_data.x1, compile_data.y1)
             return_data = ReturnData(
                     returned=False,
                     terminated=True,
@@ -1005,10 +1065,19 @@ def interpret(data, compile_data):
         elif line.startswith("wait("):
             expr = get_paren_contents(line)
             duration = eval_expr(data, compile_data.variables, expr, compile_data.i)
-
-            frame = (compile_data.variables, compile_data.i + 1, 
-                compile_data.color, compile_data.to_repeat, 0, compile_data.x0, 
-                compile_data.y0, compile_data.x1, compile_data.y1)
+            frame = CompileData(code=compile_data.code,
+                                variables=compile_data.variables,
+                                i=compile_data.i + 1,
+                                color=compile_data.color,
+                                to_repeat=compile_data.to_repeat,
+                                x0=compile_data.x0,
+                                y0=compile_data.y0,
+                                x1=compile_data.x1,
+                                y1=compile_data.y1
+                                )
+            # frame = (compile_data.variables, compile_data.i + 1, 
+            #     compile_data.color, compile_data.to_repeat, 0, compile_data.x0, 
+            #     compile_data.y0, compile_data.x1, compile_data.y1)
             return_data = ReturnData(
                     returned=False,
                     terminated=True,
@@ -1110,8 +1179,8 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code\
                     f_variables[var_name] = vals[j]
                 # 0, color, 0, x0, y0, x1, y1
                 if data.frames != []:
-                    new_compile_data = CompileData("".join(body), *data.frames.pop())
-                    result = interpret(data, new_compile_data)    
+                    # new_compile_data = CompileData("".join(body), *data.frames.pop())
+                    result = interpret(data, data.frames.pop())    
                 else:
                     new_compile_data = CompileData(
                         code="".join(body),
@@ -1138,10 +1207,20 @@ of the form\ndef function_name(argument1, argument2, argument3):\n\t#code\
                 if result.break_called or result.wait_duration:
                     # terminated keeps track of whether you've completed the inner loop or not
                     if (not result.terminated):
-                        frame = (compile_data.variables, compile_data.i, compile_data.color, 
-                            compile_data.to_repeat, 
-                            0, compile_data.x0, compile_data.y0, compile_data.x1, 
-                            compile_data.y1)
+                        frame = CompileData(code=compile_data.code,
+                                variables=compile_data.variables,
+                                i=compile_data.i,
+                                color=compile_data.color,
+                                to_repeat=compile_data.to_repeat,
+                                x0=compile_data.x0,
+                                y0=compile_data.y0,
+                                x1=compile_data.x1,
+                                y1=compile_data.y1
+                                )
+                        # frame = (compile_data.variables, compile_data.i, compile_data.color, 
+                        #     compile_data.to_repeat, 
+                        #     0, compile_data.x0, compile_data.y0, compile_data.x1, 
+                        #     compile_data.y1)
                         data.frames.append(frame)
                         return_data = ReturnData(
                             returned=False,
@@ -1293,7 +1372,7 @@ def updateconsole(data):
             line_num = data.ln_map[data.err_line//2]
         else:
             line_num = data.ln_map[data.err_line]
-        err_msg = "Error on line %d: %s" % (data.err_line, data.err_msg)
+        err_msg = "Error on line %d: %s" % (line_num, data.err_msg)
         data.console.configure(state="normal")
         data.console.delete('1.0', END)
         data.console.insert(tkinter.INSERT, err_msg)
@@ -1366,8 +1445,8 @@ def stepdebug(data):
         return 
     while len(data.frames) > 0:
         frame = data.frames.pop()
-        new_compile_data = CompileData(data.code, *frame)
-        result = interpret(data, new_compile_data)
+        # new_compile_data = CompileData(data.code, *frame)
+        result = interpret(data, frame)
         updateconsole(data)
         if result is None: # an error occured
             data.frames = []
